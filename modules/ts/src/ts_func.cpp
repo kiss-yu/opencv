@@ -3,10 +3,6 @@
 #include <limits.h>
 #include "opencv2/imgproc/types_c.h"
 
-#ifdef HAVE_TEGRA_OPTIMIZATION
-#include "tegra.hpp"
-#endif
-
 using namespace cv;
 
 namespace cvtest
@@ -353,26 +349,38 @@ void copy(const Mat& src, Mat& dst, const Mat& mask, bool invertMask)
         return;
     }
 
-    CV_Assert( src.size == mask.size && mask.type() == CV_8U );
+    int mcn = mask.channels();
+    CV_Assert( src.size == mask.size && mask.depth() == CV_8U
+               && (mcn == 1 || mcn == src.channels()) );
 
     const Mat *arrays[]={&src, &dst, &mask, 0};
     Mat planes[3];
 
     NAryMatIterator it(arrays, planes);
-    size_t j, k, elemSize = src.elemSize(), total = planes[0].total();
+    size_t j, k, elemSize = src.elemSize(), maskElemSize = mask.elemSize(), total = planes[0].total();
     size_t i, nplanes = it.nplanes;
+    size_t elemSize1 = src.elemSize1();
 
     for( i = 0; i < nplanes; i++, ++it)
     {
         const uchar* sptr = planes[0].ptr();
         uchar* dptr = planes[1].ptr();
         const uchar* mptr = planes[2].ptr();
-
-        for( j = 0; j < total; j++, sptr += elemSize, dptr += elemSize )
+        for( j = 0; j < total; j++, sptr += elemSize, dptr += elemSize, mptr += maskElemSize )
         {
-            if( (mptr[j] != 0) ^ invertMask )
-                for( k = 0; k < elemSize; k++ )
-                    dptr[k] = sptr[k];
+            if( mcn == 1)
+            {
+                if( (mptr[0] != 0) ^ invertMask )
+                    for( k = 0; k < elemSize; k++ )
+                        dptr[k] = sptr[k];
+            }
+            else
+            {
+                for( int c = 0; c < mcn; c++ )
+                    if( (mptr[c] != 0) ^ invertMask )
+                        for( k = 0; k < elemSize1; k++ )
+                            dptr[k + c * elemSize1] = sptr[k + c * elemSize1];
+            }
         }
     }
 }
@@ -414,25 +422,37 @@ void set(Mat& dst, const Scalar& gamma, const Mat& mask)
         return;
     }
 
-    CV_Assert( dst.size == mask.size && mask.type() == CV_8U );
+    int cn = dst.channels(), mcn = mask.channels();
+    CV_Assert( dst.size == mask.size && (mcn == 1 || mcn == cn) );
 
     const Mat *arrays[]={&dst, &mask, 0};
     Mat planes[2];
 
     NAryMatIterator it(arrays, planes);
-    size_t j, k, elemSize = dst.elemSize(), total = planes[0].total();
+    size_t j, k, elemSize = dst.elemSize(), maskElemSize = mask.elemSize(), total = planes[0].total();
     size_t i, nplanes = it.nplanes;
+    size_t elemSize1 = dst.elemSize1();
 
     for( i = 0; i < nplanes; i++, ++it)
     {
         uchar* dptr = planes[0].ptr();
         const uchar* mptr = planes[1].ptr();
 
-        for( j = 0; j < total; j++, dptr += elemSize )
+        for( j = 0; j < total; j++, dptr += elemSize, mptr += maskElemSize )
         {
-            if( mptr[j] )
-                for( k = 0; k < elemSize; k++ )
-                    dptr[k] = gptr[k];
+            if( mcn == 1)
+            {
+                if( mptr[0] )
+                    for( k = 0; k < elemSize; k++ )
+                        dptr[k] = gptr[k];
+            }
+            else
+            {
+                for( int c = 0; c < mcn; c++ )
+                    if( mptr[c] )
+                        for( k = 0; k < elemSize1; k++ )
+                            dptr[k + c * elemSize1] = gptr[k + c * elemSize1];
+            }
         }
     }
 }
@@ -490,6 +510,7 @@ void extract(const Mat& src, Mat& dst, int coi)
 
 void transpose(const Mat& src, Mat& dst)
 {
+    CV_Assert(src.data != dst.data && "Inplace is not support in cvtest::transpose");
     CV_Assert(src.dims == 2);
     dst.create(src.cols, src.rows, src.type());
     int i, j, k, esz = (int)src.elemSize();
@@ -2104,7 +2125,7 @@ int cmpEps2( TS* ts, const Mat& a, const Mat& b, double success_err_level,
     switch( code )
     {
     case CMP_EPS_BIG_DIFF:
-        sprintf( msg, "%s: Too big difference (=%g)", desc, diff );
+        sprintf( msg, "%s: Too big difference (=%g > %g)", desc, diff, success_err_level );
         code = TS::FAIL_BAD_ACCURACY;
         break;
     case CMP_EPS_INVALID_TEST_DATA:
@@ -2947,140 +2968,10 @@ MatComparator::operator()(const char* expr1, const char* expr2,
     return ::testing::AssertionFailure()
     << "too big relative difference (" << realmaxdiff << " > "
     << maxdiff << ") between "
-    << MatInfo(m1) << " '" << expr1 << "' and '" << expr2 << "' at " << Mat(loc0) << ".\n\n"
-    << "'" << expr1 << "': " << MatPart(m1part, border > 0 ? &loc : 0) << ".\n\n"
-    << "'" << expr2 << "': " << MatPart(m2part, border > 0 ? &loc : 0) << ".\n";
+    << MatInfo(m1) << " '" << expr1 << "' and '" << expr2 << "' at " << Mat(loc0).t() << ".\n"
+    << "- " << expr1 << ":\n" << MatPart(m1part, border > 0 ? &loc : 0) << ".\n"
+    << "- " << expr2 << ":\n" << MatPart(m2part, border > 0 ? &loc : 0) << ".\n";
 }
-
-void printVersionInfo(bool useStdOut)
-{
-    // Tell CTest not to discard any output
-    if(useStdOut) std::cout << "CTEST_FULL_OUTPUT" << std::endl;
-
-    ::testing::Test::RecordProperty("cv_version", CV_VERSION);
-    if(useStdOut) std::cout << "OpenCV version: " << CV_VERSION << std::endl;
-
-    std::string buildInfo( cv::getBuildInformation() );
-
-    size_t pos1 = buildInfo.find("Version control");
-    size_t pos2 = buildInfo.find('\n', pos1);
-    if(pos1 != std::string::npos && pos2 != std::string::npos)
-    {
-        size_t value_start = buildInfo.rfind(' ', pos2) + 1;
-        std::string ver( buildInfo.substr(value_start, pos2 - value_start) );
-        ::testing::Test::RecordProperty("cv_vcs_version", ver);
-        if (useStdOut) std::cout << "OpenCV VCS version: " << ver << std::endl;
-    }
-
-    pos1 = buildInfo.find("inner version");
-    pos2 = buildInfo.find('\n', pos1);
-    if(pos1 != std::string::npos && pos2 != std::string::npos)
-    {
-        size_t value_start = buildInfo.rfind(' ', pos2) + 1;
-        std::string ver( buildInfo.substr(value_start, pos2 - value_start) );
-        ::testing::Test::RecordProperty("cv_inner_vcs_version", ver);
-        if(useStdOut) std::cout << "Inner VCS version: " << ver << std::endl;
-    }
-
-    const char * build_type =
-#ifdef _DEBUG
-        "debug";
-#else
-        "release";
-#endif
-
-    ::testing::Test::RecordProperty("cv_build_type", build_type);
-    if (useStdOut) std::cout << "Build type: " << build_type << std::endl;
-
-    const char* parallel_framework = currentParallelFramework();
-
-    if (parallel_framework) {
-        ::testing::Test::RecordProperty("cv_parallel_framework", parallel_framework);
-        if (useStdOut) std::cout << "Parallel framework: " << parallel_framework << std::endl;
-    }
-
-    std::string cpu_features;
-
-#if CV_POPCNT
-    if (checkHardwareSupport(CV_CPU_POPCNT)) cpu_features += " popcnt";
-#endif
-#if CV_MMX
-    if (checkHardwareSupport(CV_CPU_MMX)) cpu_features += " mmx";
-#endif
-#if CV_SSE
-    if (checkHardwareSupport(CV_CPU_SSE)) cpu_features += " sse";
-#endif
-#if CV_SSE2
-    if (checkHardwareSupport(CV_CPU_SSE2)) cpu_features += " sse2";
-#endif
-#if CV_SSE3
-    if (checkHardwareSupport(CV_CPU_SSE3)) cpu_features += " sse3";
-#endif
-#if CV_SSSE3
-    if (checkHardwareSupport(CV_CPU_SSSE3)) cpu_features += " ssse3";
-#endif
-#if CV_SSE4_1
-    if (checkHardwareSupport(CV_CPU_SSE4_1)) cpu_features += " sse4.1";
-#endif
-#if CV_SSE4_2
-    if (checkHardwareSupport(CV_CPU_SSE4_2)) cpu_features += " sse4.2";
-#endif
-#if CV_AVX
-    if (checkHardwareSupport(CV_CPU_AVX)) cpu_features += " avx";
-#endif
-#if CV_AVX2
-    if (checkHardwareSupport(CV_CPU_AVX2)) cpu_features += " avx2";
-#endif
-#if CV_FMA3
-    if (checkHardwareSupport(CV_CPU_FMA3)) cpu_features += " fma3";
-#endif
-#if CV_AVX_512F
-    if (checkHardwareSupport(CV_CPU_AVX_512F)) cpu_features += " avx-512f";
-#endif
-#if CV_AVX_512BW
-    if (checkHardwareSupport(CV_CPU_AVX_512BW)) cpu_features += " avx-512bw";
-#endif
-#if CV_AVX_512CD
-    if (checkHardwareSupport(CV_CPU_AVX_512CD)) cpu_features += " avx-512cd";
-#endif
-#if CV_AVX_512DQ
-    if (checkHardwareSupport(CV_CPU_AVX_512DQ)) cpu_features += " avx-512dq";
-#endif
-#if CV_AVX_512ER
-    if (checkHardwareSupport(CV_CPU_AVX_512ER)) cpu_features += " avx-512er";
-#endif
-#if CV_AVX_512IFMA512
-    if (checkHardwareSupport(CV_CPU_AVX_512IFMA512)) cpu_features += " avx-512ifma512";
-#endif
-#if CV_AVX_512PF
-    if (checkHardwareSupport(CV_CPU_AVX_512PF)) cpu_features += " avx-512pf";
-#endif
-#if CV_AVX_512VBMI
-    if (checkHardwareSupport(CV_CPU_AVX_512VBMI)) cpu_features += " avx-512vbmi";
-#endif
-#if CV_AVX_512VL
-    if (checkHardwareSupport(CV_CPU_AVX_512VL)) cpu_features += " avx-512vl";
-#endif
-#if CV_NEON
-    if (checkHardwareSupport(CV_CPU_NEON)) cpu_features += " neon";
-#endif
-#if CV_FP16
-    if (checkHardwareSupport(CV_CPU_FP16)) cpu_features += " fp16";
-#endif
-
-    cpu_features.erase(0, 1); // erase initial space
-
-    ::testing::Test::RecordProperty("cv_cpu_features", cpu_features);
-    if (useStdOut) std::cout << "CPU features: " << cpu_features << std::endl;
-
-#ifdef HAVE_TEGRA_OPTIMIZATION
-    const char * tegra_optimization = tegra::useTegra() && tegra::isDeviceSupported() ? "enabled" : "disabled";
-    ::testing::Test::RecordProperty("cv_tegra_optimization", tegra_optimization);
-    if (useStdOut) std::cout << "Tegra optimization: " << tegra_optimization << std::endl;
-#endif
-}
-
-
 
 void threshold( const Mat& _src, Mat& _dst,
                             double thresh, double maxval, int thresh_type )

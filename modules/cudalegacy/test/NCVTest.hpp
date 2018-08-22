@@ -44,7 +44,7 @@
 #define _ncvtest_hpp_
 
 #if defined _MSC_VER
-# pragma warning( disable : 4201 4408 4127 4100)
+# pragma warning( disable : 4201 4408 4100)
 #endif
 
 #include <string>
@@ -151,8 +151,8 @@ public:
 protected:
 
     cudaDeviceProp devProp;
-    std::auto_ptr<INCVMemAllocator> allocatorGPU;
-    std::auto_ptr<INCVMemAllocator> allocatorCPU;
+    std::unique_ptr<INCVMemAllocator> allocatorGPU;
+    std::unique_ptr<INCVMemAllocator> allocatorCPU;
 
 private:
 

@@ -43,18 +43,14 @@
 #include "test_chessboardgenerator.hpp"
 
 #include <functional>
-#include <limits>
-#include <numeric>
 
-using namespace std;
-using namespace cv;
+namespace opencv_test { namespace {
 
 #define _L2_ERR
 
 //#define DEBUG_CHESSBOARD
 
 #ifdef DEBUG_CHESSBOARD
-#include "opencv2/highgui.hpp"
 void show_points( const Mat& gray, const Mat& expected, const vector<Point2f>& actual, bool was_found )
 {
     Mat rgb( gray.size(), CV_8U);
@@ -103,7 +99,7 @@ double calcError(const vector<Point2f>& v, const Mat& u)
     int count_exp = u.cols * u.rows;
     const Point2f* u_data = u.ptr<Point2f>();
 
-    double err = numeric_limits<double>::max();
+    double err = std::numeric_limits<double>::max();
     for( int k = 0; k < 2; ++k )
     {
         double err1 = 0;
@@ -202,7 +198,7 @@ void CV_ChessboardDetectorTest::run_batch( const string& filename )
 
     if( !fs.isOpened() || board_list.empty() || !board_list.isSeq() || board_list.size() % 2 != 0 )
     {
-        ts->printf( cvtest::TS::LOG, "%s can not be readed or is not valid\n", (folder + filename).c_str() );
+        ts->printf( cvtest::TS::LOG, "%s can not be read or is not valid\n", (folder + filename).c_str() );
         ts->printf( cvtest::TS::LOG, "fs.isOpened=%d, board_list.empty=%d, board_list.isSeq=%d,board_list.size()%2=%d\n",
             fs.isOpened(), (int)board_list.empty(), board_list.isSeq(), board_list.size()%2);
         ts->set_failed_test_info( cvtest::TS::FAIL_MISSING_TEST_DATA );
@@ -336,21 +332,21 @@ bool validateData(const ChessBoardGenerator& cbg, const Size& imgSz,
         {
             const Point2f& cur = mat(i, j);
 
-            tmp = norm( cur - mat(i + 1, j + 1) );
+            tmp = cv::norm(cur - mat(i + 1, j + 1)); // TODO cvtest
             if (tmp < minNeibDist)
-                tmp = minNeibDist;
+                minNeibDist = tmp;
 
-            tmp = norm( cur - mat(i - 1, j + 1 ) );
+            tmp = cv::norm(cur - mat(i - 1, j + 1)); // TODO cvtest
             if (tmp < minNeibDist)
-                tmp = minNeibDist;
+                minNeibDist = tmp;
 
-            tmp = norm( cur - mat(i + 1, j - 1) );
+            tmp = cv::norm(cur - mat(i + 1, j - 1)); // TODO cvtest
             if (tmp < minNeibDist)
-                tmp = minNeibDist;
+                minNeibDist = tmp;
 
-            tmp = norm( cur - mat(i - 1, j - 1) );
+            tmp = cv::norm(cur - mat(i - 1, j - 1)); // TODO cvtest
             if (tmp < minNeibDist)
-                tmp = minNeibDist;
+                minNeibDist = tmp;
         }
 
     const double threshold = 0.25;
@@ -438,7 +434,7 @@ bool CV_ChessboardDetectorTest::checkByGenerator()
         if (found)
             res = false;
 
-        Point2f c = std::accumulate(cg.begin(), cg.end(), Point2f(), plus<Point2f>()) * (1.f/cg.size());
+        Point2f c = std::accumulate(cg.begin(), cg.end(), Point2f(), std::plus<Point2f>()) * (1.f/cg.size());
 
         Mat_<double> aff(2, 3);
         aff << 1.0, 0.0, -(double)c.x, 0.0, 1.0, 0.0;
@@ -468,6 +464,9 @@ bool CV_ChessboardDetectorTest::checkByGenerator()
 TEST(Calib3d_ChessboardDetector, accuracy) {  CV_ChessboardDetectorTest test( CHESSBOARD ); test.safe_run(); }
 TEST(Calib3d_CirclesPatternDetector, accuracy) { CV_ChessboardDetectorTest test( CIRCLES_GRID ); test.safe_run(); }
 TEST(Calib3d_AsymmetricCirclesPatternDetector, accuracy) { CV_ChessboardDetectorTest test( ASYMMETRIC_CIRCLES_GRID ); test.safe_run(); }
+#ifdef HAVE_OPENCV_FLANN
 TEST(Calib3d_AsymmetricCirclesPatternDetectorWithClustering, accuracy) { CV_ChessboardDetectorTest test( ASYMMETRIC_CIRCLES_GRID, CALIB_CB_CLUSTERING ); test.safe_run(); }
+#endif
 
+}} // namespace
 /* End of file. */

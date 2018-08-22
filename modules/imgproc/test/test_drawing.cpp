@@ -42,10 +42,7 @@
 
 #include "test_precomp.hpp"
 
-namespace {
-
-using namespace std;
-using namespace cv;
+namespace opencv_test { namespace {
 
 //#define DRAW_TEST_IMAGE
 
@@ -709,6 +706,31 @@ TEST(Drawing, polylines)
     ASSERT_EQ(cnt, 21);
 }
 
+TEST(Drawing, longline)
+{
+    Mat mat = Mat::zeros(256, 256, CV_8UC1);
+
+    line(mat, cv::Point(34, 204), cv::Point(46400, 47400), cv::Scalar(255), 3);
+    EXPECT_EQ(310, cv::countNonZero(mat));
+
+    Point pt[6];
+    pt[0].x = 32;
+    pt[0].y = 204;
+    pt[1].x = 34;
+    pt[1].y = 202;
+    pt[2].x = 87;
+    pt[2].y = 255;
+    pt[3].x = 82;
+    pt[3].y = 255;
+    pt[4].x = 37;
+    pt[4].y = 210;
+    pt[5].x = 37;
+    pt[5].y = 209;
+    fillConvexPoly(mat, pt, 6, cv::Scalar(0));
+
+    EXPECT_EQ(0, cv::countNonZero(mat));
+}
+
 
 TEST(Drawing, putText_no_garbage)
 {
@@ -725,5 +747,11 @@ TEST(Drawing, putText_no_garbage)
 }
 
 
+TEST(Drawing, line)
+{
+    Mat mat = Mat::zeros(Size(100,100), CV_8UC1);
 
-} // namespace
+    ASSERT_THROW(line(mat, Point(1,1),Point(99,99),Scalar(255),0), cv::Exception);
+}
+
+}} // namespace

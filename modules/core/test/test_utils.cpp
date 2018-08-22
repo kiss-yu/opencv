@@ -1,12 +1,9 @@
 // This file is part of OpenCV project.
 // It is subject to the license terms in the LICENSE file found in the top-level directory
 // of this distribution and at http://opencv.org/license.html.
-
 #include "test_precomp.hpp"
 
-using namespace cv;
-
-namespace {
+namespace opencv_test { namespace {
 
 static const char * const keys =
     "{ h help    |       | print help }"
@@ -35,8 +32,14 @@ TEST(CommandLineParser, testHas_noValues)
     cv::CommandLineParser parser(argc, argv, keys);
     EXPECT_TRUE(parser.has("help"));
     EXPECT_TRUE(parser.has("h"));
+    EXPECT_TRUE(parser.get<bool>("help"));
+    EXPECT_TRUE(parser.get<bool>("h"));
     EXPECT_TRUE(parser.has("info"));
     EXPECT_TRUE(parser.has("i"));
+    EXPECT_TRUE(parser.get<bool>("info"));
+    EXPECT_TRUE(parser.get<bool>("i"));
+    EXPECT_TRUE(parser.get<bool>("true"));
+    EXPECT_TRUE(parser.get<bool>("t"));
     EXPECT_FALSE(parser.has("n"));
     EXPECT_FALSE(parser.has("unused"));
 }
@@ -47,8 +50,14 @@ TEST(CommandLineParser, testHas_TrueValues)
     cv::CommandLineParser parser(argc, argv, keys);
     EXPECT_TRUE(parser.has("help"));
     EXPECT_TRUE(parser.has("h"));
+    EXPECT_TRUE(parser.get<bool>("help"));
+    EXPECT_TRUE(parser.get<bool>("h"));
     EXPECT_TRUE(parser.has("info"));
     EXPECT_TRUE(parser.has("i"));
+    EXPECT_TRUE(parser.get<bool>("info"));
+    EXPECT_TRUE(parser.get<bool>("i"));
+    EXPECT_TRUE(parser.get<bool>("true"));
+    EXPECT_TRUE(parser.get<bool>("t"));
     EXPECT_FALSE(parser.has("n"));
     EXPECT_FALSE(parser.has("unused"));
 }
@@ -59,8 +68,14 @@ TEST(CommandLineParser, testHas_TrueValues1)
     cv::CommandLineParser parser(argc, argv, keys);
     EXPECT_TRUE(parser.has("help"));
     EXPECT_TRUE(parser.has("h"));
+    EXPECT_TRUE(parser.get<bool>("help"));
+    EXPECT_TRUE(parser.get<bool>("h"));
     EXPECT_TRUE(parser.has("info"));
     EXPECT_TRUE(parser.has("i"));
+    EXPECT_TRUE(parser.get<bool>("info"));
+    EXPECT_TRUE(parser.get<bool>("i"));
+    EXPECT_TRUE(parser.get<bool>("true"));
+    EXPECT_TRUE(parser.get<bool>("t"));
     EXPECT_FALSE(parser.has("n"));
     EXPECT_FALSE(parser.has("unused"));
 }
@@ -71,8 +86,14 @@ TEST(CommandLineParser, testHas_FalseValues0)
     cv::CommandLineParser parser(argc, argv, keys);
     EXPECT_TRUE(parser.has("help"));
     EXPECT_TRUE(parser.has("h"));
+    EXPECT_FALSE(parser.get<bool>("help"));
+    EXPECT_FALSE(parser.get<bool>("h"));
     EXPECT_TRUE(parser.has("info"));
     EXPECT_TRUE(parser.has("i"));
+    EXPECT_FALSE(parser.get<bool>("info"));
+    EXPECT_FALSE(parser.get<bool>("i"));
+    EXPECT_TRUE(parser.get<bool>("true"));
+    EXPECT_TRUE(parser.get<bool>("t"));
     EXPECT_FALSE(parser.has("n"));
     EXPECT_FALSE(parser.has("unused"));
 }
@@ -99,30 +120,38 @@ TEST(CommandLineParser, testBoolOption_noValues)
     EXPECT_TRUE(parser.get<bool>("h"));
     EXPECT_TRUE(parser.get<bool>("info"));
     EXPECT_TRUE(parser.get<bool>("i"));
+    EXPECT_TRUE(parser.get<bool>("true"));
+    EXPECT_TRUE(parser.get<bool>("t"));
 }
 
 TEST(CommandLineParser, testBoolOption_TrueValues)
 {
-    const char* argv[] = {"<bin>", "-h=TRUE", "--info=true"};
-    const int argc = 3;
+    const char* argv[] = {"<bin>", "-h=TrUe", "-t=1", "--info=true", "-n=truE"};
+    const int argc = 5;
     cv::CommandLineParser parser(argc, argv, keys);
-    //EXPECT_TRUE(parser.get<bool>("help"));
-    //EXPECT_TRUE(parser.get<bool>("h"));
+    EXPECT_TRUE(parser.get<bool>("help"));
+    EXPECT_TRUE(parser.get<bool>("h"));
     EXPECT_TRUE(parser.get<bool>("info"));
     EXPECT_TRUE(parser.get<bool>("i"));
-    EXPECT_FALSE(parser.get<bool>("unused"));
-    EXPECT_FALSE(parser.get<bool>("n"));
+    EXPECT_TRUE(parser.get<bool>("true"));
+    EXPECT_TRUE(parser.get<bool>("t"));
+    EXPECT_TRUE(parser.get<bool>("unused"));
+    EXPECT_TRUE(parser.get<bool>("n"));
 }
 
 TEST(CommandLineParser, testBoolOption_FalseValues)
 {
-    const char* argv[] = {"<bin>", "--help=FALSE", "-i=false"};
-    const int argc = 3;
+    const char* argv[] = {"<bin>", "--help=FALSE", "-t=FaLsE", "-i=false", "-n=0"};
+    const int argc = 5;
     cv::CommandLineParser parser(argc, argv, keys);
     EXPECT_FALSE(parser.get<bool>("help"));
     EXPECT_FALSE(parser.get<bool>("h"));
     EXPECT_FALSE(parser.get<bool>("info"));
     EXPECT_FALSE(parser.get<bool>("i"));
+    EXPECT_FALSE(parser.get<bool>("true"));
+    EXPECT_FALSE(parser.get<bool>("t"));
+    EXPECT_FALSE(parser.get<bool>("unused"));
+    EXPECT_FALSE(parser.get<bool>("n"));
 }
 
 
@@ -232,4 +261,26 @@ TEST(AutoBuffer, allocate_test)
     EXPECT_EQ(6u, abuf.size());
 }
 
-} // namespace
+TEST(CommandLineParser, testScalar)
+{
+    static const char * const keys3 =
+            "{ s0 | 3 4 5 | default scalar }"
+            "{ s1 |       | single value scalar }"
+            "{ s2 |       | two values scalar (default with zeros) }"
+            "{ s3 |       | three values scalar }"
+            "{ s4 |       | four values scalar }"
+            "{ s5 |       | five values scalar }";
+
+    const char* argv[] = {"<bin>", "--s1=1.1", "--s3=1.1 2.2 3",
+                          "--s4=-4.2 1 0 3", "--s5=5 -4 3 2 1"};
+    const int argc = 5;
+    CommandLineParser parser(argc, argv, keys3);
+    EXPECT_EQ(parser.get<Scalar>("s0"), Scalar(3, 4, 5));
+    EXPECT_EQ(parser.get<Scalar>("s1"), Scalar(1.1));
+    EXPECT_EQ(parser.get<Scalar>("s2"), Scalar(0));
+    EXPECT_EQ(parser.get<Scalar>("s3"), Scalar(1.1, 2.2, 3));
+    EXPECT_EQ(parser.get<Scalar>("s4"), Scalar(-4.2, 1, 0, 3));
+    EXPECT_EQ(parser.get<Scalar>("s5"), Scalar(5, -4, 3, 2));
+}
+
+}} // namespace

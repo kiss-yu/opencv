@@ -55,8 +55,8 @@ namespace cv { namespace cuda { namespace device
 {
     namespace fast
     {
-        int calcKeypoints_gpu(PtrStepSzb img, PtrStepSzb mask, short2* kpLoc, int maxKeypoints, PtrStepSzi score, int threshold, cudaStream_t stream);
-        int nonmaxSuppression_gpu(const short2* kpLoc, int count, PtrStepSzi score, short2* loc, float* response, cudaStream_t stream);
+        int calcKeypoints_gpu(PtrStepSzb img, PtrStepSzb mask, short2* kpLoc, int maxKeypoints, PtrStepSzi score, int threshold, unsigned int* d_counter, cudaStream_t stream);
+        int nonmaxSuppression_gpu(const short2* kpLoc, int count, PtrStepSzi score, short2* loc, float* response, unsigned int* d_counter, cudaStream_t stream);
     }
 }}}
 
@@ -81,13 +81,15 @@ namespace
         virtual void setMaxNumPoints(int max_npoints) { max_npoints_ = max_npoints; }
         virtual int getMaxNumPoints() const { return max_npoints_; }
 
-        virtual void setType(int type) { CV_Assert( type == TYPE_9_16 ); }
-        virtual int getType() const { return TYPE_9_16; }
+        virtual void setType(int type) { CV_Assert( type == cv::FastFeatureDetector::TYPE_9_16 ); }
+        virtual int getType() const { return cv::FastFeatureDetector::TYPE_9_16; }
 
     private:
         int threshold_;
         bool nonmaxSuppression_;
         int max_npoints_;
+
+        unsigned int* d_counter;
     };
 
     FAST_Impl::FAST_Impl(int threshold, bool nonmaxSuppression, int max_npoints) :
@@ -114,6 +116,8 @@ namespace
     {
         using namespace cv::cuda::device::fast;
 
+        cudaSafeCall( cudaMalloc(&d_counter, sizeof(unsigned int)) );
+
         const GpuMat img = _image.getGpuMat();
         const GpuMat mask = _mask.getGpuMat();
 
@@ -131,7 +135,7 @@ namespace
             score.setTo(Scalar::all(0), stream);
         }
 
-        int count = calcKeypoints_gpu(img, mask, kpLoc.ptr<short2>(), max_npoints_, score, threshold_, StreamAccessor::getStream(stream));
+        int count = calcKeypoints_gpu(img, mask, kpLoc.ptr<short2>(), max_npoints_, score, threshold_, d_counter, StreamAccessor::getStream(stream));
         count = std::min(count, max_npoints_);
 
         if (count == 0)
@@ -145,7 +149,7 @@ namespace
 
         if (nonmaxSuppression_)
         {
-            count = nonmaxSuppression_gpu(kpLoc.ptr<short2>(), count, score, keypoints.ptr<short2>(LOCATION_ROW), keypoints.ptr<float>(RESPONSE_ROW), StreamAccessor::getStream(stream));
+            count = nonmaxSuppression_gpu(kpLoc.ptr<short2>(), count, score, keypoints.ptr<short2>(LOCATION_ROW), keypoints.ptr<float>(RESPONSE_ROW), d_counter, StreamAccessor::getStream(stream));
             if (count == 0)
             {
                 keypoints.release();
@@ -161,6 +165,8 @@ namespace
             kpLoc.colRange(0, count).copyTo(locRow, stream);
             keypoints.row(1).setTo(Scalar::all(0), stream);
         }
+
+        cudaSafeCall( cudaFree(d_counter) );
     }
 
     void FAST_Impl::convert(InputArray _gpu_keypoints, std::vector<KeyPoint>& keypoints)
@@ -201,7 +207,7 @@ namespace
 
 Ptr<cv::cuda::FastFeatureDetector> cv::cuda::FastFeatureDetector::create(int threshold, bool nonmaxSuppression, int type, int max_npoints)
 {
-    CV_Assert( type == TYPE_9_16 );
+    CV_Assert( type == cv::FastFeatureDetector::TYPE_9_16 );
     return makePtr<FAST_Impl>(threshold, nonmaxSuppression, max_npoints);
 }
 

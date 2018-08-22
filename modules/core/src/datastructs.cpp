@@ -2547,6 +2547,7 @@ cvSetAdd( CvSet* set, CvSetElem* element, CvSetElem** inserted_element )
 CV_IMPL void
 cvSetRemove( CvSet* set, int index )
 {
+    CV_Assert(set != NULL);
     CvSetElem* elem = cvGetSetElem( set, index );
     if( elem )
         cvSetRemoveByPtr( set, elem );
@@ -2778,7 +2779,7 @@ cvGraphAddEdgeByPtr( CvGraph* graph,
 
     if( start_vtx == end_vtx )
         CV_Error( start_vtx ? CV_StsBadArg : CV_StsNullPtr,
-        "vertex pointers coinside (or set to NULL)" );
+        "vertex pointers coincide (or set to NULL)" );
 
     edge = (CvGraphEdge*)cvSetNew( (CvSet*)(graph->edges) );
     assert( edge->flags >= 0 );
@@ -2881,7 +2882,7 @@ cvGraphRemoveEdgeByPtr( CvGraph* graph, CvGraphVtx* start_vtx, CvGraphVtx* end_v
             break;
     }
 
-    assert( edge != 0 );
+    CV_Assert( edge != 0 );
 
     next_edge = edge->next[ofs];
     if( prev_edge )

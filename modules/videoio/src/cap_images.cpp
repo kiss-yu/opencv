@@ -74,17 +74,17 @@ public:
         grabbedInOpen = false;
     }
 
-    virtual ~CvCapture_Images()
+    virtual ~CvCapture_Images() CV_OVERRIDE
     {
         close();
     }
 
     virtual bool open(const char* _filename);
     virtual void close();
-    virtual double getProperty(int) const;
-    virtual bool setProperty(int, double);
-    virtual bool grabFrame();
-    virtual IplImage* retrieveFrame(int);
+    virtual double getProperty(int) const CV_OVERRIDE;
+    virtual bool setProperty(int, double) CV_OVERRIDE;
+    virtual bool grabFrame() CV_OVERRIDE;
+    virtual IplImage* retrieveFrame(int) CV_OVERRIDE;
 
 protected:
     char*  filename; // actually a printf-pattern
@@ -209,7 +209,7 @@ static char* icvExtractPattern(const char *filename, unsigned *offset)
     char *at = strchr(name, '%');
     if(at)
     {
-        int dummy;
+        unsigned int dummy;
         if(sscanf(at + 1, "%ud", &dummy) != 1)
             return 0;
         name = strdup(filename);
@@ -236,6 +236,7 @@ static char* icvExtractPattern(const char *filename, unsigned *offset)
 
         int size = (int)strlen(filename) + 20;
         name = (char *)malloc(size);
+        CV_Assert(name != NULL);
         strncpy(name, filename, at - filename);
         name[at - filename] = 0;
 
@@ -245,7 +246,7 @@ static char* icvExtractPattern(const char *filename, unsigned *offset)
         char *extension;
         for(i = 0, extension = at; isdigit(at[i]); i++, extension++)
             ;
-        char places[10];
+        char places[13] = {0};
         sprintf(places, "%dd", i);
 
         strcat(name, places);
@@ -320,7 +321,7 @@ CvCapture* cvCreateFileCapture_Images(const char * filename)
 // image sequence writer
 //
 //
-class CvVideoWriter_Images : public CvVideoWriter
+class CvVideoWriter_Images CV_FINAL : public CvVideoWriter
 {
 public:
     CvVideoWriter_Images()
@@ -332,8 +333,8 @@ public:
 
     virtual bool open( const char* _filename );
     virtual void close();
-    virtual bool setProperty( int, double );
-    virtual bool writeFrame( const IplImage* );
+    virtual bool setProperty( int, double ); // FIXIT doesn't work: IVideoWriter interface only!
+    virtual bool writeFrame( const IplImage* ) CV_OVERRIDE;
 
 protected:
     char* filename;

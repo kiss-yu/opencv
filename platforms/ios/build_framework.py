@@ -28,7 +28,7 @@ Adding --dynamic parameter will build opencv2.framework as App Store dynamic fra
 """
 
 from __future__ import print_function
-import glob, re, os, os.path, shutil, string, sys, argparse, traceback
+import glob, re, os, os.path, shutil, string, sys, argparse, traceback, multiprocessing
 from subprocess import check_call, check_output, CalledProcessError
 
 def execute(cmd, cwd = None):
@@ -152,6 +152,9 @@ class Builder:
                 "ONLY_ACTIVE_ARCH=NO",
             ]
 
+            if not self.bitcodedisabled:
+                buildcmd.append("BITCODE_GENERATION_MODE=bitcode")
+
             for arch in archs:
                 buildcmd.append("-arch")
                 buildcmd.append(arch.lower())
@@ -166,7 +169,7 @@ class Builder:
                 "-sdk", target.lower(),
                 "-configuration", "Release",
                 "-parallelizeTargets",
-                "-jobs", "4",
+                "-jobs", str(multiprocessing.cpu_count()),
             ] + (["-target","ALL_BUILD"] if self.dynamic else [])
 
         return buildcmd
@@ -278,7 +281,7 @@ if __name__ == "__main__":
 
     b = iOSBuilder(args.opencv, args.contrib, args.dynamic, args.bitcodedisabled, args.without,
         [
-            (["armv7", "arm64"], "iPhoneOS"),
+            (["armv7s", "arm64"], "iPhoneOS"),
         ] if os.environ.get('BUILD_PRECOMMIT', None) else
         [
             (["armv7", "armv7s", "arm64"], "iPhoneOS"),

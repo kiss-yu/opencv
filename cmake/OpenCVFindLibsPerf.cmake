@@ -2,31 +2,6 @@
 #  Detect other 3rd-party performance and math libraries
 # ----------------------------------------------------------------------------
 
-# --- Lapack ---
-# if(WITH_LAPACK)
-#   if(WIN32)
-#     set(BLA_STATIC 1)
-#   endif()
-#   find_package(LAPACK)
-#   if(LAPACK_FOUND)
-#     find_path(LAPACKE_INCLUDE_DIR "lapacke.h")
-#     find_path(MKL_LAPACKE_INCLUDE_DIR "mkl_lapack.h")
-#     if(LAPACKE_INCLUDE_DIR)
-#       ocv_include_directories(${LAPACKE_INCLUDE_DIR})
-#       set(HAVE_LAPACK 1)
-#       set(HAVE_LAPACK_GENERIC 1)
-#     elseif(MKL_LAPACKE_INCLUDE_DIR)
-#       ocv_include_directories(${MKL_LAPACKE_INCLUDE_DIR})
-#       set(HAVE_LAPACK 1)
-#       set(HAVE_LAPACK_MKL 1)
-#     elseif(APPLE)
-#       set(HAVE_LAPACK 1)
-#       set(HAVE_LAPACK_APPLE 1)
-#     endif()
-#     list(APPEND OPENCV_LINKER_LIBS ${LAPACK_LIBRARIES})
-#   endif()
-# endif()
-
 # --- TBB ---
 if(WITH_TBB)
   include("${OpenCV_SOURCE_DIR}/cmake/OpenCVDetectTBB.cmake")
@@ -36,8 +11,20 @@ endif(WITH_TBB)
 if(WITH_IPP)
   include("${OpenCV_SOURCE_DIR}/cmake/OpenCVFindIPP.cmake")
   if(HAVE_IPP)
+    include("${OpenCV_SOURCE_DIR}/cmake/OpenCVFindIPPIW.cmake")
+    if(HAVE_IPP_IW)
+      ocv_include_directories(${IPP_IW_INCLUDES})
+      list(APPEND OPENCV_LINKER_LIBS ${IPP_IW_LIBRARIES})
+    endif()
     ocv_include_directories(${IPP_INCLUDE_DIRS})
     list(APPEND OPENCV_LINKER_LIBS ${IPP_LIBRARIES})
+
+    # Details: #10229
+    if(ANDROID AND NOT OPENCV_SKIP_ANDROID_IPP_FIX_1)
+      set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--exclude-libs,libippicv.a -Wl,--exclude-libs,libippiw.a ${CMAKE_SHARED_LINKER_FLAGS}")
+    elseif(ANDROID AND NOT OPENCV_SKIP_ANDROID_IPP_FIX_2)
+      set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-Bsymbolic ${CMAKE_SHARED_LINKER_FLAGS}")
+    endif()
   endif()
 endif()
 
@@ -55,6 +42,12 @@ endif(WITH_IPP_A)
 # --- CUDA ---
 if(WITH_CUDA)
   include("${OpenCV_SOURCE_DIR}/cmake/OpenCVDetectCUDA.cmake")
+  if(NOT HAVE_CUDA)
+    message(WARNING "OpenCV is not able to find/configure CUDA SDK (required by WITH_CUDA).
+CUDA support will be disabled in OpenCV build.
+To eliminate this warning remove WITH_CUDA=ON CMake configuration option.
+")
+  endif()
 endif(WITH_CUDA)
 
 # --- Eigen ---
@@ -111,22 +104,15 @@ if(WITH_CLP)
   endif()
 endif(WITH_CLP)
 
-# --- C= ---
-if(WITH_CSTRIPES AND NOT HAVE_TBB)
-  include("${OpenCV_SOURCE_DIR}/cmake/OpenCVDetectCStripes.cmake")
-else()
-  set(HAVE_CSTRIPES 0)
-endif()
-
 # --- GCD ---
-if(APPLE AND NOT HAVE_TBB AND NOT HAVE_CSTRIPES)
+if(APPLE AND NOT HAVE_TBB)
   set(HAVE_GCD 1)
 else()
   set(HAVE_GCD 0)
 endif()
 
 # --- Concurrency ---
-if(MSVC AND NOT HAVE_TBB AND NOT HAVE_CSTRIPES)
+if(MSVC AND NOT HAVE_TBB)
   set(_fname "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/concurrencytest.cpp")
   file(WRITE "${_fname}" "#if _MSC_VER < 1600\n#error\n#endif\nint main() { return 0; }\n")
   try_compile(HAVE_CONCURRENCY "${CMAKE_BINARY_DIR}" "${_fname}")
@@ -145,16 +131,9 @@ if(WITH_OPENMP)
   set(HAVE_OPENMP "${OPENMP_FOUND}")
 endif()
 
-if(NOT MSVC AND NOT DEFINED HAVE_PTHREADS)
-  set(_fname "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/pthread_test.cpp")
-  file(WRITE "${_fname}" "#include <pthread.h>\nint main() { (void)pthread_self(); return 0; }\n")
-  try_compile(HAVE_PTHREADS "${CMAKE_BINARY_DIR}" "${_fname}")
-  file(REMOVE "${_fname}")
-endif()
-
 ocv_clear_vars(HAVE_PTHREADS_PF)
-if(WITH_PTHREADS_PF)
-  set(HAVE_PTHREADS_PF ${HAVE_PTHREADS})
+if(WITH_PTHREADS_PF AND HAVE_PTHREAD)
+  set(HAVE_PTHREADS_PF 1)
 else()
   set(HAVE_PTHREADS_PF 0)
 endif()

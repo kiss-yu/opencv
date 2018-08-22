@@ -56,7 +56,7 @@
   @{
     @defgroup cudacore Core part
     @{
-      @defgroup cudacore_init Initalization and Information
+      @defgroup cudacore_init Initialization and Information
       @defgroup cudacore_struct Data Structures
     @}
   @}
@@ -91,9 +91,18 @@ aligned to a size depending on the hardware. Single-row GpuMat is always a conti
 on its destructor. The destruction order of such variables and CUDA context is undefined. GPU memory
 release function returns error if the CUDA context has been destroyed before.
 
+Some member functions are described as a "Blocking Call" while some are described as a
+"Non-Blocking Call". Blocking functions are synchronous to host. It is guaranteed that the GPU
+operation is finished when the function returns. However, non-blocking functions are asynchronous to
+host. Those functions may return even if the GPU operation is not finished.
+
+Compared to their blocking counterpart, non-blocking functions accept Stream as an additional
+argument. If a non-default stream is passed, the GPU operation may overlap with operations in other
+streams.
+
 @sa Mat
  */
-class CV_EXPORTS GpuMat
+class CV_EXPORTS_W GpuMat
 {
 public:
     class CV_EXPORTS Allocator
@@ -111,15 +120,15 @@ public:
     static void setDefaultAllocator(Allocator* allocator);
 
     //! default constructor
-    explicit GpuMat(Allocator* allocator = defaultAllocator());
+    CV_WRAP explicit GpuMat(GpuMat::Allocator* allocator = GpuMat::defaultAllocator());
 
     //! constructs GpuMat of the specified size and type
-    GpuMat(int rows, int cols, int type, Allocator* allocator = defaultAllocator());
-    GpuMat(Size size, int type, Allocator* allocator = defaultAllocator());
+    CV_WRAP GpuMat(int rows, int cols, int type, GpuMat::Allocator* allocator = GpuMat::defaultAllocator());
+    CV_WRAP GpuMat(Size size, int type, GpuMat::Allocator* allocator = GpuMat::defaultAllocator());
 
     //! constucts GpuMat and fills it with the specified value _s
-    GpuMat(int rows, int cols, int type, Scalar s, Allocator* allocator = defaultAllocator());
-    GpuMat(Size size, int type, Scalar s, Allocator* allocator = defaultAllocator());
+    CV_WRAP GpuMat(int rows, int cols, int type, Scalar s, GpuMat::Allocator* allocator = GpuMat::defaultAllocator());
+    CV_WRAP GpuMat(Size size, int type, Scalar s, GpuMat::Allocator* allocator = GpuMat::defaultAllocator());
 
     //! copy constructor
     GpuMat(const GpuMat& m);
@@ -133,7 +142,7 @@ public:
     GpuMat(const GpuMat& m, Rect roi);
 
     //! builds GpuMat from host memory (Blocking call)
-    explicit GpuMat(InputArray arr, Allocator* allocator = defaultAllocator());
+    CV_WRAP explicit GpuMat(InputArray arr, GpuMat::Allocator* allocator = GpuMat::defaultAllocator());
 
     //! destructor - calls release()
     ~GpuMat();
@@ -142,8 +151,8 @@ public:
     GpuMat& operator =(const GpuMat& m);
 
     //! allocates new GpuMat data unless the GpuMat already has specified size and type
-    void create(int rows, int cols, int type);
-    void create(Size size, int type);
+    CV_WRAP void create(int rows, int cols, int type);
+    CV_WRAP void create(Size size, int type);
 
     //! decreases reference counter, deallocate the data when reference counter reaches 0
     void release();
@@ -151,32 +160,54 @@ public:
     //! swaps with other smart pointer
     void swap(GpuMat& mat);
 
-    //! pefroms upload data to GpuMat (Blocking call)
-    void upload(InputArray arr);
+    /** @brief Performs data upload to GpuMat (Blocking call)
 
-    //! pefroms upload data to GpuMat (Non-Blocking call)
-    void upload(InputArray arr, Stream& stream);
+    This function copies data from host memory to device memory. As being a blocking call, it is
+    guaranteed that the copy operation is finished when this function returns.
+    */
+    CV_WRAP void upload(InputArray arr);
 
-    //! pefroms download data from device to host memory (Blocking call)
-    void download(OutputArray dst) const;
+    /** @brief Performs data upload to GpuMat (Non-Blocking call)
 
-    //! pefroms download data from device to host memory (Non-Blocking call)
-    void download(OutputArray dst, Stream& stream) const;
+    This function copies data from host memory to device memory. As being a non-blocking call, this
+    function may return even if the copy operation is not finished.
+
+    The copy operation may be overlapped with operations in other non-default streams if \p stream is
+    not the default stream and \p dst is HostMem allocated with HostMem::PAGE_LOCKED option.
+    */
+    CV_WRAP void upload(InputArray arr, Stream& stream);
+
+    /** @brief Performs data download from GpuMat (Blocking call)
+
+    This function copies data from device memory to host memory. As being a blocking call, it is
+    guaranteed that the copy operation is finished when this function returns.
+    */
+    CV_WRAP void download(OutputArray dst) const;
+
+    /** @brief Performs data download from GpuMat (Non-Blocking call)
+
+    This function copies data from device memory to host memory. As being a non-blocking call, this
+    function may return even if the copy operation is not finished.
+
+    The copy operation may be overlapped with operations in other non-default streams if \p stream is
+    not the default stream and \p dst is HostMem allocated with HostMem::PAGE_LOCKED option.
+    */
+    CV_WRAP void download(OutputArray dst, Stream& stream) const;
 
     //! returns deep copy of the GpuMat, i.e. the data is copied
     GpuMat clone() const;
 
     //! copies the GpuMat content to device memory (Blocking call)
-    void copyTo(OutputArray dst) const;
+    CV_WRAP void copyTo(OutputArray dst) const;
 
     //! copies the GpuMat content to device memory (Non-Blocking call)
-    void copyTo(OutputArray dst, Stream& stream) const;
+    CV_WRAP void copyTo(OutputArray dst, Stream& stream) const;
 
     //! copies those GpuMat elements to "m" that are marked with non-zero mask elements (Blocking call)
-    void copyTo(OutputArray dst, InputArray mask) const;
+    CV_WRAP void copyTo(OutputArray dst, InputArray mask) const;
 
     //! copies those GpuMat elements to "m" that are marked with non-zero mask elements (Non-Blocking call)
-    void copyTo(OutputArray dst, InputArray mask, Stream& stream) const;
+    CV_WRAP void copyTo(OutputArray dst, InputArray mask, Stream& stream) const;
 
     //! sets some of the GpuMat elements to s (Blocking call)
     GpuMat& setTo(Scalar s);
@@ -191,19 +222,19 @@ public:
     GpuMat& setTo(Scalar s, InputArray mask, Stream& stream);
 
     //! converts GpuMat to another datatype (Blocking call)
-    void convertTo(OutputArray dst, int rtype) const;
+    CV_WRAP void convertTo(OutputArray dst, int rtype) const;
 
     //! converts GpuMat to another datatype (Non-Blocking call)
-    void convertTo(OutputArray dst, int rtype, Stream& stream) const;
+    CV_WRAP void convertTo(OutputArray dst, int rtype, Stream& stream) const;
 
     //! converts GpuMat to another datatype with scaling (Blocking call)
-    void convertTo(OutputArray dst, int rtype, double alpha, double beta = 0.0) const;
+    CV_WRAP void convertTo(OutputArray dst, int rtype, double alpha, double beta = 0.0) const;
 
     //! converts GpuMat to another datatype with scaling (Non-Blocking call)
-    void convertTo(OutputArray dst, int rtype, double alpha, Stream& stream) const;
+    CV_WRAP void convertTo(OutputArray dst, int rtype, double alpha, Stream& stream) const;
 
     //! converts GpuMat to another datatype with scaling (Non-Blocking call)
-    void convertTo(OutputArray dst, int rtype, double alpha, double beta, Stream& stream) const;
+    CV_WRAP void convertTo(OutputArray dst, int rtype, double alpha, double beta, Stream& stream) const;
 
     void assignTo(GpuMat& m, int type=-1) const;
 
@@ -274,6 +305,9 @@ public:
     //! returns true if GpuMat data is NULL
     bool empty() const;
 
+    //! internal use method: updates the continuity flag
+    void updateContinuityFlag();
+
     /*! includes several bit-fields:
     - the magic signature
     - continuity flag
@@ -326,6 +360,143 @@ CV_EXPORTS void createContinuous(int rows, int cols, int type, OutputArray arr);
 The function does not reallocate memory if the matrix has proper attributes already.
  */
 CV_EXPORTS void ensureSizeIsEnough(int rows, int cols, int type, OutputArray arr);
+
+/** @brief BufferPool for use with CUDA streams
+
+BufferPool utilizes Stream's allocator to create new buffers for GpuMat's. It is
+only useful when enabled with #setBufferPoolUsage.
+
+@code
+    setBufferPoolUsage(true);
+@endcode
+
+@note #setBufferPoolUsage must be called \em before any Stream declaration.
+
+Users may specify custom allocator for Stream and may implement their own stream based
+functions utilizing the same underlying GPU memory management.
+
+If custom allocator is not specified, BufferPool utilizes StackAllocator by
+default. StackAllocator allocates a chunk of GPU device memory beforehand,
+and when GpuMat is declared later on, it is given the pre-allocated memory.
+This kind of strategy reduces the number of calls for memory allocating APIs
+such as cudaMalloc or cudaMallocPitch.
+
+Below is an example that utilizes BufferPool with StackAllocator:
+
+@code
+    #include <opencv2/opencv.hpp>
+
+    using namespace cv;
+    using namespace cv::cuda
+
+    int main()
+    {
+        setBufferPoolUsage(true);                               // Tell OpenCV that we are going to utilize BufferPool
+        setBufferPoolConfig(getDevice(), 1024 * 1024 * 64, 2);  // Allocate 64 MB, 2 stacks (default is 10 MB, 5 stacks)
+
+        Stream stream1, stream2;                                // Each stream uses 1 stack
+        BufferPool pool1(stream1), pool2(stream2);
+
+        GpuMat d_src1 = pool1.getBuffer(4096, 4096, CV_8UC1);   // 16MB
+        GpuMat d_dst1 = pool1.getBuffer(4096, 4096, CV_8UC3);   // 48MB, pool1 is now full
+
+        GpuMat d_src2 = pool2.getBuffer(1024, 1024, CV_8UC1);   // 1MB
+        GpuMat d_dst2 = pool2.getBuffer(1024, 1024, CV_8UC3);   // 3MB
+
+        cvtColor(d_src1, d_dst1, CV_GRAY2BGR, 0, stream1);
+        cvtColor(d_src2, d_dst2, CV_GRAY2BGR, 0, stream2);
+    }
+@endcode
+
+If we allocate another GpuMat on pool1 in the above example, it will be carried out by
+the DefaultAllocator since the stack for pool1 is full.
+
+@code
+    GpuMat d_add1 = pool1.getBuffer(1024, 1024, CV_8UC1);   // Stack for pool1 is full, memory is allocated with DefaultAllocator
+@endcode
+
+If a third stream is declared in the above example, allocating with #getBuffer
+within that stream will also be carried out by the DefaultAllocator because we've run out of
+stacks.
+
+@code
+    Stream stream3;                                         // Only 2 stacks were allocated, we've run out of stacks
+    BufferPool pool3(stream3);
+    GpuMat d_src3 = pool3.getBuffer(1024, 1024, CV_8UC1);   // Memory is allocated with DefaultAllocator
+@endcode
+
+@warning When utilizing StackAllocator, deallocation order is important.
+
+Just like a stack, deallocation must be done in LIFO order. Below is an example of
+erroneous usage that violates LIFO rule. If OpenCV is compiled in Debug mode, this
+sample code will emit CV_Assert error.
+
+@code
+    int main()
+    {
+        setBufferPoolUsage(true);                               // Tell OpenCV that we are going to utilize BufferPool
+        Stream stream;                                          // A default size (10 MB) stack is allocated to this stream
+        BufferPool pool(stream);
+
+        GpuMat mat1 = pool.getBuffer(1024, 1024, CV_8UC1);      // Allocate mat1 (1MB)
+        GpuMat mat2 = pool.getBuffer(1024, 1024, CV_8UC1);      // Allocate mat2 (1MB)
+
+        mat1.release();                                         // erroneous usage : mat2 must be deallocated before mat1
+    }
+@endcode
+
+Since C++ local variables are destroyed in the reverse order of construction,
+the code sample below satisfies the LIFO rule. Local GpuMat's are deallocated
+and the corresponding memory is automatically returned to the pool for later usage.
+
+@code
+    int main()
+    {
+        setBufferPoolUsage(true);                               // Tell OpenCV that we are going to utilize BufferPool
+        setBufferPoolConfig(getDevice(), 1024 * 1024 * 64, 2);  // Allocate 64 MB, 2 stacks (default is 10 MB, 5 stacks)
+
+        Stream stream1, stream2;                                // Each stream uses 1 stack
+        BufferPool pool1(stream1), pool2(stream2);
+
+        for (int i = 0; i < 10; i++)
+        {
+            GpuMat d_src1 = pool1.getBuffer(4096, 4096, CV_8UC1);   // 16MB
+            GpuMat d_dst1 = pool1.getBuffer(4096, 4096, CV_8UC3);   // 48MB, pool1 is now full
+
+            GpuMat d_src2 = pool2.getBuffer(1024, 1024, CV_8UC1);   // 1MB
+            GpuMat d_dst2 = pool2.getBuffer(1024, 1024, CV_8UC3);   // 3MB
+
+            d_src1.setTo(Scalar(i), stream1);
+            d_src2.setTo(Scalar(i), stream2);
+
+            cvtColor(d_src1, d_dst1, CV_GRAY2BGR, 0, stream1);
+            cvtColor(d_src2, d_dst2, CV_GRAY2BGR, 0, stream2);
+                                                                    // The order of destruction of the local variables is:
+                                                                    //   d_dst2 => d_src2 => d_dst1 => d_src1
+                                                                    // LIFO rule is satisfied, this code runs without error
+        }
+    }
+@endcode
+ */
+class CV_EXPORTS BufferPool
+{
+public:
+
+    //! Gets the BufferPool for the given stream.
+    explicit BufferPool(Stream& stream);
+
+    //! Allocates a new GpuMat of given size and type.
+    GpuMat getBuffer(int rows, int cols, int type);
+
+    //! Allocates a new GpuMat of given size and type.
+    GpuMat getBuffer(Size size, int type) { return getBuffer(size.height, size.width, type); }
+
+    //! Returns the allocator associated with the stream.
+    Ptr<GpuMat::Allocator> getAllocator() const { return allocator_; }
+
+private:
+    Ptr<GpuMat::Allocator> allocator_;
+};
 
 //! BufferPool management (must be called before Stream creation)
 CV_EXPORTS void setBufferPoolUsage(bool on);
@@ -479,6 +650,9 @@ public:
     //! creates a new asynchronous stream
     Stream();
 
+    //! creates a new asynchronous stream with custom allocator
+    Stream(const Ptr<GpuMat::Allocator>& allocator);
+
     /** @brief Returns true if the current stream queue is finished. Otherwise, it returns false.
     */
     bool queryIfComplete() const;
@@ -564,9 +738,10 @@ private:
 /** @brief Returns the number of installed CUDA-enabled devices.
 
 Use this function before any other CUDA functions calls. If OpenCV is compiled without CUDA support,
-this function returns 0.
+this function returns 0. If the CUDA driver is not installed, or is incompatible, this function
+returns -1.
  */
-CV_EXPORTS int getCudaEnabledDeviceCount();
+CV_EXPORTS_W int getCudaEnabledDeviceCount();
 
 /** @brief Sets a device and initializes it for the current thread.
 
@@ -574,18 +749,18 @@ CV_EXPORTS int getCudaEnabledDeviceCount();
 
 If the call of this function is omitted, a default device is initialized at the fist CUDA usage.
  */
-CV_EXPORTS void setDevice(int device);
+CV_EXPORTS_W void setDevice(int device);
 
 /** @brief Returns the current device index set by cuda::setDevice or initialized by default.
  */
-CV_EXPORTS int getDevice();
+CV_EXPORTS_W int getDevice();
 
 /** @brief Explicitly destroys and cleans up all resources associated with the current device in the current
 process.
 
 Any subsequent API call to this device will reinitialize the device.
  */
-CV_EXPORTS void resetDevice();
+CV_EXPORTS_W void resetDevice();
 
 /** @brief Enumeration providing CUDA computing features.
  */
@@ -852,8 +1027,8 @@ private:
     int device_id_;
 };
 
-CV_EXPORTS void printCudaDeviceInfo(int device);
-CV_EXPORTS void printShortCudaDeviceInfo(int device);
+CV_EXPORTS_W void printCudaDeviceInfo(int device);
+CV_EXPORTS_W void printShortCudaDeviceInfo(int device);
 
 /** @brief Converts an array to half precision floating number.
 

@@ -27,11 +27,11 @@ if(WITH_GSTREAMER AND NOT WITH_GSTREAMER_0_10)
     ENDIF(GSTREAMER_gstbase_LIBRARY AND GSTREAMER_gstvideo_LIBRARY AND GSTREAMER_gstapp_LIBRARY AND GSTREAMER_gstpbutils_LIBRARY AND GSTREAMER_gstriff_LIBRARY)
 
   else(WIN32)
-    CHECK_MODULE(gstreamer-base-1.0 HAVE_GSTREAMER_BASE)
-    CHECK_MODULE(gstreamer-video-1.0 HAVE_GSTREAMER_VIDEO)
-    CHECK_MODULE(gstreamer-app-1.0 HAVE_GSTREAMER_APP)
-    CHECK_MODULE(gstreamer-riff-1.0 HAVE_GSTREAMER_RIFF)
-    CHECK_MODULE(gstreamer-pbutils-1.0 HAVE_GSTREAMER_PBUTILS)
+    CHECK_MODULE(gstreamer-base-1.0 HAVE_GSTREAMER_BASE VIDEOIO)
+    CHECK_MODULE(gstreamer-video-1.0 HAVE_GSTREAMER_VIDEO VIDEOIO)
+    CHECK_MODULE(gstreamer-app-1.0 HAVE_GSTREAMER_APP VIDEOIO)
+    CHECK_MODULE(gstreamer-riff-1.0 HAVE_GSTREAMER_RIFF VIDEOIO)
+    CHECK_MODULE(gstreamer-pbutils-1.0 HAVE_GSTREAMER_PBUTILS VIDEOIO)
 
     if(HAVE_GSTREAMER_BASE AND HAVE_GSTREAMER_VIDEO AND HAVE_GSTREAMER_APP AND HAVE_GSTREAMER_RIFF AND HAVE_GSTREAMER_PBUTILS)
       set(HAVE_GSTREAMER TRUE)
@@ -46,11 +46,11 @@ endif(WITH_GSTREAMER AND NOT WITH_GSTREAMER_0_10)
 
 # if gstreamer 1.x was not found, or we specified we wanted 0.10, try to find it
 if(WITH_GSTREAMER AND NOT HAVE_GSTREAMER OR WITH_GSTREAMER_0_10)
-  CHECK_MODULE(gstreamer-base-0.10 HAVE_GSTREAMER_BASE)
-  CHECK_MODULE(gstreamer-video-0.10 HAVE_GSTREAMER_VIDEO)
-  CHECK_MODULE(gstreamer-app-0.10 HAVE_GSTREAMER_APP)
-  CHECK_MODULE(gstreamer-riff-0.10 HAVE_GSTREAMER_RIFF)
-  CHECK_MODULE(gstreamer-pbutils-0.10 HAVE_GSTREAMER_PBUTILS)
+  CHECK_MODULE(gstreamer-base-0.10 HAVE_GSTREAMER_BASE VIDEOIO)
+  CHECK_MODULE(gstreamer-video-0.10 HAVE_GSTREAMER_VIDEO VIDEOIO)
+  CHECK_MODULE(gstreamer-app-0.10 HAVE_GSTREAMER_APP VIDEOIO)
+  CHECK_MODULE(gstreamer-riff-0.10 HAVE_GSTREAMER_RIFF VIDEOIO)
+  CHECK_MODULE(gstreamer-pbutils-0.10 HAVE_GSTREAMER_PBUTILS VIDEOIO)
 
   if(HAVE_GSTREAMER_BASE AND HAVE_GSTREAMER_VIDEO AND HAVE_GSTREAMER_APP AND HAVE_GSTREAMER_RIFF AND HAVE_GSTREAMER_PBUTILS)
       set(HAVE_GSTREAMER TRUE)
@@ -65,8 +65,8 @@ endif(WITH_GSTREAMER AND NOT HAVE_GSTREAMER OR WITH_GSTREAMER_0_10)
 # --- unicap ---
 ocv_clear_vars(HAVE_UNICAP)
 if(WITH_UNICAP)
-  CHECK_MODULE(libunicap HAVE_UNICAP_)
-  CHECK_MODULE(libucil HAVE_UNICAP_UCIL)
+  CHECK_MODULE(libunicap HAVE_UNICAP_  VIDEOIO)
+  CHECK_MODULE(libucil HAVE_UNICAP_UCIL  VIDEOIO)
   if(HAVE_UNICAP_ AND HAVE_UNICAP_UCIL)
     set(HAVE_UNICAP TRUE)
   endif()
@@ -89,23 +89,16 @@ if(WITH_PVAPI)
       set(PVAPI_SDK_SUBDIR arm)
     endif()
 
-    get_filename_component(_PVAPI_LIBRARY "${PVAPI_INCLUDE_PATH}/../lib-pc" ABSOLUTE)
-    if(PVAPI_SDK_SUBDIR)
-      set(_PVAPI_LIBRARY "${_PVAPI_LIBRARY}/${PVAPI_SDK_SUBDIR}")
-    endif()
-    if(NOT WIN32 AND CMAKE_COMPILER_IS_GNUCXX)
-      set(_PVAPI_LIBRARY "${_PVAPI_LIBRARY}/${CMAKE_OPENCV_GCC_VERSION_MAJOR}.${CMAKE_OPENCV_GCC_VERSION_MINOR}")
-    endif()
+    get_filename_component(_PVAPI_LIBRARY_HINT "${PVAPI_INCLUDE_PATH}/../lib-pc" ABSOLUTE)
 
-    if(WIN32)
-      if(MINGW)
-        set(PVAPI_DEFINITIONS "-DPVDECL=__stdcall")
-      endif(MINGW)
-      set(PVAPI_LIBRARY "${_PVAPI_LIBRARY}/PvAPI.lib" CACHE PATH "The PvAPI library")
-    else(WIN32)
-      set(PVAPI_LIBRARY "${_PVAPI_LIBRARY}/${CMAKE_STATIC_LIBRARY_PREFIX}PvAPI${CMAKE_STATIC_LIBRARY_SUFFIX}" CACHE PATH "The PvAPI library")
-    endif(WIN32)
-    if(EXISTS "${PVAPI_LIBRARY}")
+    find_library(PVAPI_LIBRARY NAMES "PvAPI" PATHS "${_PVAPI_LIBRARY_HINT}")
+
+    if(PVAPI_LIBRARY)
+      if(WIN32)
+        if(MINGW)
+          set(PVAPI_DEFINITIONS "-DPVDECL=__stdcall")
+        endif(MINGW)
+      endif()
       set(HAVE_PVAPI TRUE)
     endif()
   endif(PVAPI_INCLUDE_PATH)
@@ -127,13 +120,18 @@ endif(WITH_GIGEAPI)
 # --- Aravis SDK ---
 ocv_clear_vars(HAVE_ARAVIS_API)
 if(WITH_ARAVIS)
-  find_path(ARAVIS_INCLUDE_PATH "arv.h"
-            PATHS /usr/local /var /opt /usr ENV ProgramFiles ENV ProgramW6432
-            PATH_SUFFIXES include "aravis-0.6" "aravis-0.4"
-            DOC "The path to Aravis SDK headers")
-  find_library(ARAVIS_LIBRARIES NAMES "aravis-0.6" "aravis-0.4" )
-  if(ARAVIS_LIBRARIES AND ARAVIS_INCLUDE_PATH)
-    set(HAVE_ARAVIS_API TRUE)
+  check_module(glib-2.0 HAVE_ARAVIS_GLIB VIDEOIO)
+  if(HAVE_ARAVIS_GLIB)
+    find_path(ARAVIS_INCLUDE_PATH "arv.h"
+              PATHS /usr/local /var /opt /usr ENV ProgramFiles ENV ProgramW6432
+              PATH_SUFFIXES include "aravis-0.6" "aravis-0.4"
+              DOC "The path to Aravis SDK headers")
+    find_library(ARAVIS_LIBRARIES NAMES "aravis-0.6" "aravis-0.4" )
+    if(ARAVIS_LIBRARIES AND ARAVIS_INCLUDE_PATH)
+      set(HAVE_ARAVIS_API TRUE)
+    endif()
+  else()
+    message("Can not build Aravis support without glib2")
   endif()
 endif(WITH_ARAVIS)
 
@@ -162,9 +160,9 @@ if(WITH_1394)
             "${CMU1394_LIB_DIR}/lib1394camera.a")
       endif(HAVE_DC1394_2)
   else(WIN32 AND MINGW)
-    CHECK_MODULE(libdc1394-2 HAVE_DC1394_2)
+    CHECK_MODULE(libdc1394-2 HAVE_DC1394_2 VIDEOIO)
     if(NOT HAVE_DC1394_2)
-      CHECK_MODULE(libdc1394 HAVE_DC1394)
+      CHECK_MODULE(libdc1394 HAVE_DC1394 VIDEOIO)
     endif()
   endif(WIN32 AND MINGW)
 endif(WITH_1394)
@@ -172,15 +170,15 @@ endif(WITH_1394)
 # --- xine ---
 ocv_clear_vars(HAVE_XINE)
 if(WITH_XINE)
-  CHECK_MODULE(libxine HAVE_XINE)
+  CHECK_MODULE(libxine HAVE_XINE VIDEOIO)
 endif(WITH_XINE)
 
 # --- V4L ---
 ocv_clear_vars(HAVE_LIBV4L HAVE_CAMV4L HAVE_CAMV4L2 HAVE_VIDEOIO)
 if(WITH_V4L)
   if(WITH_LIBV4L)
-    CHECK_MODULE(libv4l1 HAVE_LIBV4L1)
-    CHECK_MODULE(libv4l2 HAVE_LIBV4L2)
+    CHECK_MODULE(libv4l1 HAVE_LIBV4L1 VIDEOIO)
+    CHECK_MODULE(libv4l2 HAVE_LIBV4L2 VIDEOIO)
     if(HAVE_LIBV4L1 AND HAVE_LIBV4L2)
       set(HAVE_LIBV4L YES)
     else()
@@ -214,48 +212,75 @@ endif(WITH_XIMEA)
 
 # --- FFMPEG ---
 ocv_clear_vars(HAVE_FFMPEG)
-if(WITH_FFMPEG)
-  if(WIN32 AND NOT ARM)
+if(WITH_FFMPEG)  # try FFmpeg autodetection
+  if(OPENCV_FFMPEG_USE_FIND_PACKAGE)
+    if(OPENCV_FFMPEG_USE_FIND_PACKAGE STREQUAL "1" OR OPENCV_FFMPEG_USE_FIND_PACKAGE STREQUAL "ON")
+      set(OPENCV_FFMPEG_USE_FIND_PACKAGE "FFMPEG")
+    endif()
+    find_package(${OPENCV_FFMPEG_USE_FIND_PACKAGE}) # Required components: AVCODEC AVFORMAT AVUTIL SWSCALE
+    if(FFMPEG_FOUND OR FFmpeg_FOUND)
+      set(HAVE_FFMPEG TRUE)
+    else()
+      message(STATUS "Can't find FFmpeg via find_package(${OPENCV_FFMPEG_USE_FIND_PACKAGE})")
+    endif()
+  elseif(WIN32 AND NOT ARM AND NOT OPENCV_FFMPEG_SKIP_DOWNLOAD)
     include("${OpenCV_SOURCE_DIR}/3rdparty/ffmpeg/ffmpeg.cmake")
-    set(HAVE_FFMPEG TRUE)
+    download_win_ffmpeg(FFMPEG_CMAKE_SCRIPT)
+    if(FFMPEG_CMAKE_SCRIPT)
+      set(HAVE_FFMPEG TRUE)
+      set(HAVE_FFMPEG_WRAPPER 1)
+      include("${FFMPEG_CMAKE_SCRIPT}")
+    endif()
   elseif(PKG_CONFIG_FOUND)
     ocv_check_modules(FFMPEG libavcodec libavformat libavutil libswscale)
     ocv_check_modules(FFMPEG_libavresample libavresample)
     if(FFMPEG_libavresample_FOUND)
       ocv_append_build_options(FFMPEG FFMPEG_libavresample)
     endif()
-    if(HAVE_FFMPEG)
-      try_compile(__VALID_FFMPEG
-          "${OpenCV_BINARY_DIR}"
-          "${OpenCV_SOURCE_DIR}/cmake/checks/ffmpeg_test.cpp"
-          CMAKE_FLAGS "-DINCLUDE_DIRECTORIES:STRING=${FFMPEG_INCLUDE_DIRS}"
-                      "-DLINK_DIRECTORIES:STRING=${FFMPEG_LIBRARY_DIRS}"
-                      "-DLINK_LIBRARIES:STRING=${FFMPEG_LIBRARIES}"
-          OUTPUT_VARIABLE TRY_OUT
-      )
-      if(NOT __VALID_FFMPEG)
-        #message(FATAL_ERROR "FFMPEG: test check build log:\n${TRY_OUT}")
-        message(STATUS "WARNING: Can't build ffmpeg test code")
-        set(HAVE_FFMPEG FALSE)
-      else()
-        ocv_append_build_options(VIDEOIO FFMPEG)
-      endif()
-    endif()
   else()
     message(STATUS "Can't find ffmpeg - 'pkg-config' utility is missing")
   endif()
-endif(WITH_FFMPEG)
+endif()
+if(HAVE_FFMPEG
+    AND NOT HAVE_FFMPEG_WRAPPER
+)
+  try_compile(__VALID_FFMPEG
+      "${OpenCV_BINARY_DIR}"
+      "${OpenCV_SOURCE_DIR}/cmake/checks/ffmpeg_test.cpp"
+      CMAKE_FLAGS "-DINCLUDE_DIRECTORIES:STRING=${FFMPEG_INCLUDE_DIRS}"
+                  "-DLINK_DIRECTORIES:STRING=${FFMPEG_LIBRARY_DIRS}"
+                  "-DLINK_LIBRARIES:STRING=${FFMPEG_LIBRARIES}"
+      OUTPUT_VARIABLE TRY_OUT
+  )
+  if(NOT __VALID_FFMPEG)
+    #message(FATAL_ERROR "FFMPEG: test check build log:\n${TRY_OUT}")
+    message(STATUS "WARNING: Can't build ffmpeg test code")
+    set(HAVE_FFMPEG FALSE)
+  else()
+    ocv_append_build_options(VIDEOIO FFMPEG)
+  endif()
+endif()
 
 # --- VideoInput/DirectShow ---
 if(WITH_DSHOW)
-  # always have VideoInput on Windows
-  set(HAVE_DSHOW 1)
+  if(MSVC_VERSION GREATER 1499)
+    set(HAVE_DSHOW 1)
+  elseif(NOT HAVE_DSHOW)
+    check_include_file(DShow.h HAVE_DSHOW)
+  endif()
 endif(WITH_DSHOW)
 
 # --- VideoInput/Microsoft Media Foundation ---
 ocv_clear_vars(HAVE_MSMF)
 if(WITH_MSMF)
   check_include_file(Mfapi.h HAVE_MSMF)
+  check_include_file(D3D11.h D3D11_found)
+  check_include_file(D3d11_4.h D3D11_4_found)
+  if(D3D11_found AND D3D11_4_found)
+    set(HAVE_DXVA YES)
+  else()
+    set(HAVE_DXVA NO)
+  endif()
 endif(WITH_MSMF)
 
 # --- Extra HighGUI and VideoIO libs on Windows ---
@@ -285,15 +310,24 @@ if(APPLE)
   endif()
 endif(APPLE)
 
+# --- Intel librealsense ---
+if(WITH_LIBREALSENSE)
+  include("${OpenCV_SOURCE_DIR}/cmake/OpenCVFindLibRealsense.cmake")
+endif(WITH_LIBREALSENSE)
+
 # --- Intel Perceptual Computing SDK ---
 if(WITH_INTELPERC)
   include("${OpenCV_SOURCE_DIR}/cmake/OpenCVFindIntelPerCSDK.cmake")
 endif(WITH_INTELPERC)
 
+if(WITH_MFX)
+  include("${OpenCV_SOURCE_DIR}/cmake/OpenCVDetectMediaSDK.cmake")
+endif()
+
 # --- gPhoto2 ---
 ocv_clear_vars(HAVE_GPHOTO2)
 if(WITH_GPHOTO2)
-  CHECK_MODULE(libgphoto2 HAVE_GPHOTO2)
+  CHECK_MODULE(libgphoto2 HAVE_GPHOTO2 VIDEOIO)
 endif(WITH_GPHOTO2)
 
 # --- VA & VA_INTEL ---

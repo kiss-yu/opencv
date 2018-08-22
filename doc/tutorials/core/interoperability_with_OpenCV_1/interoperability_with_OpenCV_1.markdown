@@ -1,6 +1,9 @@
 Interoperability with OpenCV 1 {#tutorial_interoperability_with_OpenCV_1}
 ==============================
 
+@prev_tutorial{tutorial_file_input_output_with_xml_yml}
+@next_tutorial{tutorial_how_to_use_ippa_conversion}
+
 Goal
 ----
 
@@ -46,7 +49,7 @@ and the subsequent words start with a capital letter (like *copyMakeBorder*).
 
 Now, remember that you need to link to your application all the modules you use, and in case you are
 on Windows using the *DLL* system you will need to add, again, to the path all the binaries. For
-more in-depth information if you're on Windows read @ref tutorial_windows_visual_studio_Opencv and for
+more in-depth information if you're on Windows read @ref tutorial_windows_visual_studio_opencv and for
 Linux an example usage is explained in @ref tutorial_linux_eclipse.
 
 Now for converting the *Mat* object you can use either the *IplImage* or the *CvMat* operators.
@@ -69,7 +72,7 @@ CvMat* mI        =  &I.operator CvMat();
 @endcode
 One of the biggest complaints of the C interface is that it leaves all the memory management to you.
 You need to figure out when it is safe to release your unused objects and make sure you do so before
-the program finishes or you could have troublesome memory leeks. To work around this issue in OpenCV
+the program finishes or you could have troublesome memory leaks. To work around this issue in OpenCV
 there is introduced a sort of smart pointer. This will automatically release the object when it's no
 longer in use. To use this declare the pointers as a specialization of the *Ptr* :
 @code{.cpp}
@@ -137,8 +140,4 @@ or find it in the
 `samples/cpp/tutorial_code/core/interoperability_with_OpenCV_1/interoperability_with_OpenCV_1.cpp`
 of the OpenCV source code library.
 
-\htmlonly
-<div align="center">
-<iframe title="Interoperability with OpenCV 1" width="560" height="349" src="http://www.youtube.com/embed/qckm-zvo31w?rel=0&loop=1" frameborder="0" allowfullscreen align="middle"></iframe>
-</div>
-\endhtmlonly
+@youtube{qckm-zvo31w}

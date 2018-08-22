@@ -82,26 +82,42 @@ static NSAutoreleasePool *pool = nil;
 static NSMutableDictionary *windows = nil;
 static bool wasInitialized = false;
 
-@interface CVView : NSView
-@property(strong) NSImage *image;
+@interface CVView : NSView {
+    NSImage *image;
+}
+@property(retain) NSImage *image;
 - (void)setImageData:(CvArr *)arr;
 @end
 
-@interface CVSlider : NSView
-@property(strong) NSSlider *slider;
-@property(strong) NSTextField *name;
+@interface CVSlider : NSView {
+    NSSlider *slider;
+    NSTextField *name;
+    int *value;
+    void *userData;
+    CvTrackbarCallback callback;
+    CvTrackbarCallback2 callback2;
+}
+@property(retain) NSSlider *slider;
+@property(retain) NSTextField *name;
 @property(assign) int *value;
 @property(assign) void *userData;
 @property(assign) CvTrackbarCallback callback;
 @property(assign) CvTrackbarCallback2 callback2;
 @end
 
-@interface CVWindow : NSWindow
+@interface CVWindow : NSWindow {
+    NSMutableDictionary *sliders;
+    CvMouseCallback mouseCallback;
+    void *mouseParam;
+    BOOL autosize;
+    BOOL firstContent;
+    int status;
+}
 @property(assign) CvMouseCallback mouseCallback;
 @property(assign) void *mouseParam;
 @property(assign) BOOL autosize;
 @property(assign) BOOL firstContent;
-@property(strong) NSMutableDictionary *sliders;
+@property(retain) NSMutableDictionary *sliders;
 @property(readwrite) int status;
 - (CVView *)contentView;
 - (void)cvSendMouseEvent:(NSEvent *)event type:(int)type flags:(int)flags;
@@ -588,6 +604,38 @@ CV_IMPL int cvWaitKey (int maxWait)
     [localpool drain];
 
     return returnCode;
+}
+
+CvRect cvGetWindowRect_COCOA( const char* name )
+{
+    CvRect result = cvRect(-1, -1, -1, -1);
+    CVWindow *window = nil;
+
+    CV_FUNCNAME( "cvGetWindowRect_COCOA" );
+
+    __BEGIN__;
+    if( name == NULL )
+    {
+        CV_ERROR( CV_StsNullPtr, "NULL name string" );
+    }
+
+    window = cvGetWindow( name );
+    if ( window == NULL )
+    {
+        CV_ERROR( CV_StsNullPtr, "NULL window" );
+    } else {
+        NSRect rect = [window frame];
+#if MAC_OS_X_VERSION_MAX_ALLOWED > MAC_OS_X_VERSION_10_6
+        NSPoint pt = [window convertRectToScreen:rect].origin;
+#else
+        NSPoint pt = [window convertBaseToScreen:rect.origin];
+#endif
+        NSSize sz = [[[window contentView] image] size];
+        result = cvRect(pt.x, pt.y, sz.width, sz.height);
+    }
+
+    __END__;
+    return result;
 }
 
 double cvGetModeWindow_COCOA( const char* name )

@@ -116,6 +116,7 @@ void cv::fastNlMeansDenoising( InputArray _src, OutputArray _dst, const std::vec
     CV_INSTRUMENT_REGION()
 
     int hn = (int)h.size(), type = _src.type(), depth = CV_MAT_DEPTH(type), cn = CV_MAT_CN(type);
+    CV_Assert(!_src.empty());
     CV_Assert(hn == 1 || hn == cn);
 
     Size src_size = _src.size();
@@ -130,11 +131,6 @@ void cv::fastNlMeansDenoising( InputArray _src, OutputArray _dst, const std::vec
 
     switch (normType) {
         case NORM_L2:
-#ifdef HAVE_TEGRA_OPTIMIZATION
-            if(hn == 1 && tegra::useTegra() &&
-               tegra::fastNlMeansDenoising(src, dst, h[0], templateWindowSize, searchWindowSize))
-                return;
-#endif
             switch (depth) {
                 case CV_8U:
                     fastNlMeansDenoising_<uchar, int, unsigned, DistSquared>(src, dst, h,

@@ -50,11 +50,11 @@
 #include <vector>
 # include "directx.inc.hpp"
 #else // HAVE_DIRECTX
-#define NO_DIRECTX_SUPPORT_ERROR CV_ErrorNoReturn(cv::Error::StsBadFunc, "OpenCV was build without DirectX support")
+#define NO_DIRECTX_SUPPORT_ERROR CV_Error(cv::Error::StsBadFunc, "OpenCV was build without DirectX support")
 #endif
 
 #ifndef HAVE_OPENCL
-# define NO_OPENCL_SUPPORT_ERROR CV_ErrorNoReturn(cv::Error::StsBadFunc, "OpenCV was build without OpenCL support")
+# define NO_OPENCL_SUPPORT_ERROR CV_Error(cv::Error::StsBadFunc, "OpenCV was build without OpenCL support")
 #endif // HAVE_OPENCL
 
 namespace cv { namespace directx {
@@ -794,7 +794,9 @@ void convertToD3D11Texture2D(InputArray src, ID3D11Texture2D* pD3D11Texture2D)
 
     cl_int status = 0;
     cl_mem clImage = 0;
+#ifdef HAVE_DIRECTX_NV12
     cl_mem clImageUV = 0;
+#endif
 
     clImage = clCreateFromD3D11Texture2DKHR(context, CL_MEM_WRITE_ONLY, pD3D11Texture2D, 0, &status);
     if (status != CL_SUCCESS)

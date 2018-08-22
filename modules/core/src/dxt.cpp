@@ -908,7 +908,7 @@ DFT(const OcvDftOptions & c, const Complex<T>* src, Complex<T>* dst)
             int p, q, factor2 = (factor - 1)/2;
             int d, dd, dw_f = c.tab_size/factor;
             AutoBuffer<Complex<T> > buf(factor2 * 2);
-            Complex<T>* a = buf;
+            Complex<T>* a = buf.data();
             Complex<T>* b = a + factor2;
 
             for( i = 0; i < c.n; i += n )
@@ -1562,7 +1562,7 @@ public:
         *ok = true;
     }
 
-    virtual void operator()(const Range& range) const
+    virtual void operator()(const Range& range) const CV_OVERRIDE
     {
         IppStatus status;
         Ipp8u* pBuffer = 0;
@@ -1580,13 +1580,13 @@ public:
             return;
         }
 
-        IppiDFTSpec_C_32fc* pDFTSpec = (IppiDFTSpec_C_32fc*)ippMalloc( sizeSpec );
+        IppiDFTSpec_C_32fc* pDFTSpec = (IppiDFTSpec_C_32fc*)CV_IPP_MALLOC( sizeSpec );
 
         if ( sizeInit > 0 )
-            pMemInit = (Ipp8u*)ippMalloc( sizeInit );
+            pMemInit = (Ipp8u*)CV_IPP_MALLOC( sizeInit );
 
         if ( sizeBuffer > 0 )
-            pBuffer = (Ipp8u*)ippMalloc( sizeBuffer );
+            pBuffer = (Ipp8u*)CV_IPP_MALLOC( sizeBuffer );
 
         status = ippiDFTInit_C_32fc( srcRoiSize, norm_flag, ippAlgHintNone, pDFTSpec, pMemInit );
 
@@ -1643,7 +1643,7 @@ public:
         *ok = true;
     }
 
-    virtual void operator()(const Range& range) const
+    virtual void operator()(const Range& range) const CV_OVERRIDE
     {
         IppStatus status;
         Ipp8u* pBuffer = 0;
@@ -1661,13 +1661,13 @@ public:
             return;
         }
 
-        IppiDFTSpec_R_32f* pDFTSpec = (IppiDFTSpec_R_32f*)ippMalloc( sizeSpec );
+        IppiDFTSpec_R_32f* pDFTSpec = (IppiDFTSpec_R_32f*)CV_IPP_MALLOC( sizeSpec );
 
         if ( sizeInit > 0 )
-            pMemInit = (Ipp8u*)ippMalloc( sizeInit );
+            pMemInit = (Ipp8u*)CV_IPP_MALLOC( sizeInit );
 
         if ( sizeBuffer > 0 )
-            pBuffer = (Ipp8u*)ippMalloc( sizeBuffer );
+            pBuffer = (Ipp8u*)CV_IPP_MALLOC( sizeBuffer );
 
         status = ippiDFTInit_R_32f( srcRoiSize, norm_flag, ippAlgHintNone, pDFTSpec, pMemInit );
 
@@ -1767,13 +1767,13 @@ static bool ippi_DFT_C_32F(const uchar * src, size_t src_step, uchar * dst, size
     if ( status < 0 )
         return false;
 
-    IppiDFTSpec_C_32fc* pDFTSpec = (IppiDFTSpec_C_32fc*)ippMalloc( sizeSpec );
+    IppiDFTSpec_C_32fc* pDFTSpec = (IppiDFTSpec_C_32fc*)CV_IPP_MALLOC( sizeSpec );
 
     if ( sizeInit > 0 )
-        pMemInit = (Ipp8u*)ippMalloc( sizeInit );
+        pMemInit = (Ipp8u*)CV_IPP_MALLOC( sizeInit );
 
     if ( sizeBuffer > 0 )
-        pBuffer = (Ipp8u*)ippMalloc( sizeBuffer );
+        pBuffer = (Ipp8u*)CV_IPP_MALLOC( sizeBuffer );
 
     status = ippiDFTInit_C_32fc( srcRoiSize, norm_flag, ippAlgHintNone, pDFTSpec, pMemInit );
 
@@ -1823,13 +1823,13 @@ static bool ippi_DFT_R_32F(const uchar * src, size_t src_step, uchar * dst, size
     if ( status < 0 )
         return false;
 
-    IppiDFTSpec_R_32f* pDFTSpec = (IppiDFTSpec_R_32f*)ippMalloc( sizeSpec );
+    IppiDFTSpec_R_32f* pDFTSpec = (IppiDFTSpec_R_32f*)CV_IPP_MALLOC( sizeSpec );
 
     if ( sizeInit > 0 )
-        pMemInit = (Ipp8u*)ippMalloc( sizeInit );
+        pMemInit = (Ipp8u*)CV_IPP_MALLOC( sizeInit );
 
     if ( sizeBuffer > 0 )
-        pBuffer = (Ipp8u*)ippMalloc( sizeBuffer );
+        pBuffer = (Ipp8u*)CV_IPP_MALLOC( sizeBuffer );
 
     status = ippiDFTInit_R_32f( srcRoiSize, norm_flag, ippAlgHintNone, pDFTSpec, pMemInit );
 
@@ -2135,13 +2135,38 @@ static bool ocl_dft_cols(InputArray _src, OutputArray _dst, int nonzero_cols, in
     return plan->enqueueTransform(_src, _dst, nonzero_cols, flags, fftType, false);
 }
 
+inline FftType determineFFTType(bool real_input, bool complex_input, bool real_output, bool complex_output, bool inv)
+{
+    // output format is not specified
+    if (!real_output && !complex_output)
+        complex_output = true;
+
+    // input or output format is ambiguous
+    if (real_input == complex_input || real_output == complex_output)
+        CV_Error(Error::StsBadArg, "Invalid FFT input or output format");
+
+    FftType result = real_input ? (real_output ? R2R : R2C) : (real_output ? C2R : C2C);
+
+    // Forward Complex to CCS not supported
+    if (result == C2R && !inv)
+        result = C2C;
+
+    // Inverse CCS to Complex not supported
+    if (result == R2C && inv)
+        result = R2R;
+
+    return result;
+}
+
 static bool ocl_dft(InputArray _src, OutputArray _dst, int flags, int nonzero_rows)
 {
     int type = _src.type(), cn = CV_MAT_CN(type), depth = CV_MAT_DEPTH(type);
     Size ssize = _src.size();
     bool doubleSupport = ocl::Device::getDefault().doubleFPConfig() > 0;
 
-    if ( !((cn == 1 || cn == 2) && (depth == CV_32F || (depth == CV_64F && doubleSupport))) )
+    if (!(cn == 1 || cn == 2)
+        || !(depth == CV_32F || (depth == CV_64F && doubleSupport))
+        || ((flags & DFT_REAL_OUTPUT) && (flags & DFT_COMPLEX_OUTPUT)))
         return false;
 
     // if is not a multiplication of prime numbers { 2, 3, 5 }
@@ -2149,34 +2174,14 @@ static bool ocl_dft(InputArray _src, OutputArray _dst, int flags, int nonzero_ro
         return false;
 
     UMat src = _src.getUMat();
-    int complex_input = cn == 2 ? 1 : 0;
-    int complex_output = (flags & DFT_COMPLEX_OUTPUT) != 0;
-    int real_input = cn == 1 ? 1 : 0;
-    int real_output = (flags & DFT_REAL_OUTPUT) != 0;
     bool inv = (flags & DFT_INVERSE) != 0 ? 1 : 0;
 
     if( nonzero_rows <= 0 || nonzero_rows > _src.rows() )
         nonzero_rows = _src.rows();
     bool is1d = (flags & DFT_ROWS) != 0 || nonzero_rows == 1;
 
-    // if output format is not specified
-    if (complex_output + real_output == 0)
-    {
-        if (real_input)
-            real_output = 1;
-        else
-            complex_output = 1;
-    }
-
-    FftType fftType = (FftType)(complex_input << 0 | complex_output << 1);
-
-    // Forward Complex to CCS not supported
-    if (fftType == C2R && !inv)
-        fftType = C2C;
-
-    // Inverse CCS to Complex not supported
-    if (fftType == R2C && inv)
-        fftType = R2R;
+    FftType fftType = determineFFTType(cn == 1, cn == 2,
+        (flags & DFT_REAL_OUTPUT) != 0, (flags & DFT_COMPLEX_OUTPUT) != 0, inv);
 
     UMat output;
     if (fftType == C2C || fftType == R2C)
@@ -2200,51 +2205,38 @@ static bool ocl_dft(InputArray _src, OutputArray _dst, int flags, int nonzero_ro
         }
     }
 
+    bool result = false;
     if (!inv)
     {
-        if (!ocl_dft_rows(src, output, nonzero_rows, flags, fftType))
-            return false;
-
+        int nonzero_cols = fftType == R2R ? output.cols/2 + 1 : output.cols;
+        result = ocl_dft_rows(src, output, nonzero_rows, flags, fftType);
         if (!is1d)
-        {
-            int nonzero_cols = fftType == R2R ? output.cols/2 + 1 : output.cols;
-            if (!ocl_dft_cols(output, _dst, nonzero_cols, flags, fftType))
-                return false;
-        }
+            result = result && ocl_dft_cols(output, _dst, nonzero_cols, flags, fftType);
     }
     else
     {
         if (fftType == C2C)
         {
             // complex output
-            if (!ocl_dft_rows(src, output, nonzero_rows, flags, fftType))
-                return false;
-
+            result = ocl_dft_rows(src, output, nonzero_rows, flags, fftType);
             if (!is1d)
-            {
-                if (!ocl_dft_cols(output, output, output.cols, flags, fftType))
-                    return false;
-            }
+                result = result && ocl_dft_cols(output, output, output.cols, flags, fftType);
         }
         else
         {
             if (is1d)
             {
-                if (!ocl_dft_rows(src, output, nonzero_rows, flags, fftType))
-                    return false;
+                result = ocl_dft_rows(src, output, nonzero_rows, flags, fftType);
             }
             else
             {
                 int nonzero_cols = src.cols/2 + 1;
-                if (!ocl_dft_cols(src, output, nonzero_cols, flags, fftType))
-                    return false;
-
-                if (!ocl_dft_rows(output, _dst, nonzero_rows, flags, fftType))
-                    return false;
+                result = ocl_dft_cols(src, output, nonzero_cols, flags, fftType);
+                result = result && ocl_dft_rows(output, _dst, nonzero_rows, flags, fftType);
             }
         }
     }
-    return true;
+    return result;
 }
 
 } // namespace cv;
@@ -2615,7 +2607,7 @@ inline DftDims determineDims(int rows, int cols, bool isRowWise, bool isContinuo
     return InvalidDim;
 }
 
-class OcvDftImpl : public hal::DFT2D
+class OcvDftImpl CV_FINAL : public hal::DFT2D
 {
 protected:
     Ptr<hal::DFT1D> contextA;
@@ -2787,7 +2779,7 @@ public:
         }
     }
 
-    void apply(const uchar * src, size_t src_step, uchar * dst, size_t dst_step)
+    void apply(const uchar * src, size_t src_step, uchar * dst, size_t dst_step) CV_OVERRIDE
     {
 #if defined USE_IPP_DFT
         if (useIpp)
@@ -2903,7 +2895,7 @@ protected:
             uchar* dptr = dptr0;
 
             if( needBufferA )
-                dptr = tmp_bufA;
+                dptr = tmp_bufA.data();
 
             contextA->apply(sptr, dptr);
 
@@ -2929,12 +2921,12 @@ protected:
         const uchar* sptr0 = src_data;
         uchar* dptr0 = dst_data;
 
-        dbuf0 = buf0, dbuf1 = buf1;
+        dbuf0 = buf0.data(), dbuf1 = buf1.data();
 
         if( needBufferB )
         {
-            dbuf1 = tmp_bufB;
-            dbuf0 = buf1;
+            dbuf1 = tmp_bufB.data();
+            dbuf0 = buf1.data();
         }
 
         if( real_transform )
@@ -2945,42 +2937,42 @@ protected:
             b = (count+1)/2;
             if( !inv )
             {
-                memset( buf0, 0, len*complex_elem_size );
-                CopyColumn( sptr0, src_step, buf0, complex_elem_size, len, elem_size );
+                memset( buf0.data(), 0, len*complex_elem_size );
+                CopyColumn( sptr0, src_step, buf0.data(), complex_elem_size, len, elem_size );
                 sptr0 += stage_dst_channels*elem_size;
                 if( even )
                 {
-                    memset( buf1, 0, len*complex_elem_size );
+                    memset( buf1.data(), 0, len*complex_elem_size );
                     CopyColumn( sptr0 + (count-2)*elem_size, src_step,
-                                buf1, complex_elem_size, len, elem_size );
+                                buf1.data(), complex_elem_size, len, elem_size );
                 }
             }
             else if( stage_src_channels == 1 )
             {
-                CopyColumn( sptr0, src_step, buf0, elem_size, len, elem_size );
-                ExpandCCS( buf0, len, elem_size );
+                CopyColumn( sptr0, src_step, buf0.data(), elem_size, len, elem_size );
+                ExpandCCS( buf0.data(), len, elem_size );
                 if( even )
                 {
                     CopyColumn( sptr0 + (count-1)*elem_size, src_step,
-                                buf1, elem_size, len, elem_size );
-                    ExpandCCS( buf1, len, elem_size );
+                                buf1.data(), elem_size, len, elem_size );
+                    ExpandCCS( buf1.data(), len, elem_size );
                 }
                 sptr0 += elem_size;
             }
             else
             {
-                CopyColumn( sptr0, src_step, buf0, complex_elem_size, len, complex_elem_size );
+                CopyColumn( sptr0, src_step, buf0.data(), complex_elem_size, len, complex_elem_size );
                 if( even )
                 {
                     CopyColumn( sptr0 + b*complex_elem_size, src_step,
-                                   buf1, complex_elem_size, len, complex_elem_size );
+                                   buf1.data(), complex_elem_size, len, complex_elem_size );
                 }
                 sptr0 += complex_elem_size;
             }
 
             if( even )
-                contextB->apply(buf1, dbuf1);
-            contextB->apply(buf0, dbuf0);
+                contextB->apply(buf1.data(), dbuf1);
+            contextB->apply(buf0.data(), dbuf0);
 
             if( stage_dst_channels == 1 )
             {
@@ -3027,13 +3019,13 @@ protected:
         {
             if( i+1 < b )
             {
-                CopyFrom2Columns( sptr0, src_step, buf0, buf1, len, complex_elem_size );
-                contextB->apply(buf1, dbuf1);
+                CopyFrom2Columns( sptr0, src_step, buf0.data(), buf1.data(), len, complex_elem_size );
+                contextB->apply(buf1.data(), dbuf1);
             }
             else
-                CopyColumn( sptr0, src_step, buf0, complex_elem_size, len, complex_elem_size );
+                CopyColumn( sptr0, src_step, buf0.data(), complex_elem_size, len, complex_elem_size );
 
-            contextB->apply(buf0, dbuf0);
+            contextB->apply(buf0.data(), dbuf0);
 
             if( i+1 < b )
                 CopyTo2Columns( dbuf0, dbuf1, dptr0, dst_step, len, complex_elem_size );
@@ -3047,7 +3039,7 @@ protected:
     }
 };
 
-class OcvDftBasicImpl : public hal::DFT1D
+class OcvDftBasicImpl CV_FINAL : public hal::DFT1D
 {
 public:
     OcvDftOptions opt;
@@ -3142,9 +3134,9 @@ public:
             if (len != prev_len || (!inplace_transform && opt.isInverse && real_transform))
             {
                 wave_buf.allocate(opt.n*complex_elem_size);
-                opt.wave = wave_buf;
+                opt.wave = wave_buf.data();
                 itab_buf.allocate(opt.n);
-                opt.itab = itab_buf;
+                opt.itab = itab_buf.data();
                 DFTInit( opt.n, opt.nf, opt.factors, opt.itab, complex_elem_size,
                          opt.wave, stage == 0 && opt.isInverse && real_transform );
             }
@@ -3202,7 +3194,7 @@ public:
         }
     }
 
-    void apply(const uchar *src, uchar *dst)
+    void apply(const uchar *src, uchar *dst) CV_OVERRIDE
     {
         opt.dft_func(opt, src, dst);
     }
@@ -3222,7 +3214,7 @@ struct ReplacementDFT1D : public hal::DFT1D
         isInitialized = (res == CV_HAL_ERROR_OK);
         return isInitialized;
     }
-    void apply(const uchar *src, uchar *dst)
+    void apply(const uchar *src, uchar *dst) CV_OVERRIDE
     {
         if (isInitialized)
         {
@@ -3252,7 +3244,7 @@ struct ReplacementDFT2D : public hal::DFT2D
         isInitialized = (res == CV_HAL_ERROR_OK);
         return isInitialized;
     }
-    void apply(const uchar *src, size_t src_step, uchar *dst, size_t dst_step)
+    void apply(const uchar *src, size_t src_step, uchar *dst, size_t dst_step) CV_OVERRIDE
     {
         if (isInitialized)
         {
@@ -3341,6 +3333,9 @@ void cv::dft( InputArray _src0, OutputArray _dst, int flags, int nonzero_rows )
     int depth = src.depth();
 
     CV_Assert( type == CV_32FC1 || type == CV_32FC2 || type == CV_64FC1 || type == CV_64FC2 );
+
+    // Fail if DFT_COMPLEX_INPUT is specified, but src is not 2 channels.
+    CV_Assert( !((flags & DFT_COMPLEX_INPUT) && src.channels() != 2) );
 
     if( !inv && src.channels() == 1 && (flags & DFT_COMPLEX_OUTPUT) )
         _dst.create( src.size(), CV_MAKETYPE(depth, 2) );
@@ -3814,7 +3809,7 @@ public:
         *ok = true;
     }
 
-    virtual void operator()(const Range& range) const
+    virtual void operator()(const Range& range) const CV_OVERRIDE
     {
         if(*ok == false)
             return;
@@ -3849,20 +3844,20 @@ public:
             return;
         }
 
-        pDCTSpec = (Ipp8u*)ippMalloc(specSize);
+        pDCTSpec = (Ipp8u*)CV_IPP_MALLOC(specSize);
         if(!pDCTSpec && specSize)
         {
             *ok = false;
             return;
         }
 
-        pBuffer  = (Ipp8u*)ippMalloc(bufferSize);
+        pBuffer  = (Ipp8u*)CV_IPP_MALLOC(bufferSize);
         if(!pBuffer && bufferSize)
         {
             *ok = false;
             IPP_RETURN
         }
-        pInitBuf = (Ipp8u*)ippMalloc(initSize);
+        pInitBuf = (Ipp8u*)CV_IPP_MALLOC(initSize);
         if(!pInitBuf && initSize)
         {
             *ok = false;
@@ -3978,17 +3973,17 @@ static bool ippi_DCT_32f(const uchar * src, size_t src_step, uchar * dst, size_t
         if(ippDctGetSize(srcRoiSize, &specSize, &initSize, &bufferSize) < 0)
             return false;
 
-        pDCTSpec = (Ipp8u*)ippMalloc(specSize);
+        pDCTSpec = (Ipp8u*)CV_IPP_MALLOC(specSize);
         if(!pDCTSpec && specSize)
             return false;
 
-        pBuffer  = (Ipp8u*)ippMalloc(bufferSize);
+        pBuffer  = (Ipp8u*)CV_IPP_MALLOC(bufferSize);
         if(!pBuffer && bufferSize)
         {
             IPP_RELEASE
             return false;
         }
-        pInitBuf = (Ipp8u*)ippMalloc(initSize);
+        pInitBuf = (Ipp8u*)CV_IPP_MALLOC(initSize);
         if(!pInitBuf && initSize)
         {
             IPP_RELEASE
@@ -4053,7 +4048,7 @@ static bool ippi_DCT_32f(const uchar * src, size_t src_step, uchar * dst, size_t
 
 namespace cv {
 
-class OcvDctImpl : public hal::DCT2D
+class OcvDctImpl CV_FINAL : public hal::DCT2D
 {
 public:
     OcvDftOptions opt;
@@ -4105,7 +4100,7 @@ public:
             end_stage = 1;
         }
     }
-    void apply(const uchar *src, size_t src_step, uchar *dst, size_t dst_step)
+    void apply(const uchar *src, size_t src_step, uchar *dst, size_t dst_step) CV_OVERRIDE
     {
         CV_IPP_RUN(IPP_VERSION_X100 >= 700 && depth == CV_32F, ippi_DCT_32f(src, src_step, dst, dst_step, width, height, isInverse, isRowTransform))
 
@@ -4157,31 +4152,31 @@ public:
                 bool inplace_transform = opt.factors[0] == opt.factors[opt.nf-1];
 
                 wave_buf.allocate(len*complex_elem_size);
-                opt.wave = wave_buf;
+                opt.wave = wave_buf.data();
                 itab_buf.allocate(len);
-                opt.itab = itab_buf;
+                opt.itab = itab_buf.data();
                 DFTInit( len, opt.nf, opt.factors, opt.itab, complex_elem_size, opt.wave, isInverse );
 
                 dct_wave.allocate((len/2 + 1)*complex_elem_size);
                 src_buf.allocate(len*elem_size);
-                src_dft_buf = src_buf;
+                src_dft_buf = src_buf.data();
                 if(!inplace_transform)
                 {
                     dst_buf.allocate(len*elem_size);
-                    dst_dft_buf = dst_buf;
+                    dst_dft_buf = dst_buf.data();
                 }
                 else
                 {
-                    dst_dft_buf = src_buf;
+                    dst_dft_buf = src_buf.data();
                 }
-                DCTInit( len, complex_elem_size, dct_wave, isInverse);
+                DCTInit( len, complex_elem_size, dct_wave.data(), isInverse);
                 prev_len = len;
             }
             // otherwise reuse the tables calculated on the previous stage
             for(unsigned i = 0; i < static_cast<unsigned>(count); i++ )
             {
                 dct_func( opt, sptr + i*sstep0, sstep1, src_dft_buf, dst_dft_buf,
-                          dptr + i*dstep0, dstep1, dct_wave);
+                          dptr + i*dstep0, dstep1, dct_wave.data());
             }
             src = dst;
             src_step = dst_step;
@@ -4201,7 +4196,7 @@ struct ReplacementDCT2D : public hal::DCT2D
         isInitialized = (res == CV_HAL_ERROR_OK);
         return isInitialized;
     }
-    void apply(const uchar *src_data, size_t src_step, uchar *dst_data, size_t dst_step)
+    void apply(const uchar *src_data, size_t src_step, uchar *dst_data, size_t dst_step) CV_OVERRIDE
     {
         if (isInitialized)
         {

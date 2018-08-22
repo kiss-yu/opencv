@@ -41,8 +41,7 @@
 
 #include "test_precomp.hpp"
 
-using namespace cv;
-using namespace std;
+namespace opencv_test { namespace {
 
 template <typename T, typename compute>
 class ShapeBaseTest : public cvtest::BaseTest
@@ -63,7 +62,7 @@ public:
         {
             for (int j = 0; j < NSN; ++j)
             {
-                stringstream filename;
+                std::stringstream filename;
                 filename << cvtest::TS::ptr()->get_data_path()
                          << "shape/mpeg_test/" << *i << "-" << j + 1 << ".png";
                 filenames.push_back(filename.str());
@@ -83,6 +82,9 @@ protected:
 
     vector<PointType> convertContourType(const Mat& currentQuery) const
     {
+        if (currentQuery.empty()) {
+            return vector<PointType>();
+        }
         vector<vector<Point> > _contoursQuery;
         findContours(currentQuery, _contoursQuery, RETR_LIST, CHAIN_APPROX_NONE);
 
@@ -103,7 +105,7 @@ protected:
         }
 
         // Uniformly sampling
-        random_shuffle(contoursQuery.begin(), contoursQuery.end());
+        cv::randShuffle(contoursQuery);
         int nStart=NP;
         vector<PointType> cont;
         for (int i=0; i<nStart; i++)
@@ -318,3 +320,5 @@ TEST(computeDistance, regression_4976)
     EXPECT_NEAR(d1, 26.4196891785, 1e-3) << "HausdorffDistanceExtractor";
     EXPECT_NEAR(d2, 0.25804194808, 1e-3) << "ShapeContextDistanceExtractor";
 }
+
+}} // namespace

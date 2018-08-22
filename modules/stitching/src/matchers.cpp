@@ -42,6 +42,8 @@
 
 #include "precomp.hpp"
 
+#include "opencv2/core/opencl/ocl_defs.hpp"
+
 using namespace cv;
 using namespace cv::detail;
 using namespace cv::cuda;
@@ -49,6 +51,11 @@ using namespace cv::cuda;
 #ifdef HAVE_OPENCV_XFEATURES2D
 #include "opencv2/xfeatures2d.hpp"
 using xfeatures2d::SURF;
+using xfeatures2d::SIFT;
+#endif
+
+#ifdef HAVE_OPENCV_CUDAIMGPROC
+#  include "opencv2/cudaimgproc.hpp"
 #endif
 
 namespace {
@@ -68,7 +75,7 @@ struct MatchPairsBody : ParallelLoopBody
             : matcher(_matcher), features(_features),
               pairwise_matches(_pairwise_matches), near_pairs(_near_pairs) {}
 
-    void operator ()(const Range &r) const
+    void operator ()(const Range &r) const CV_OVERRIDE
     {
         cv::RNG rng = cv::theRNG(); // save entry rng state
         const int num_images = static_cast<int>(features.size());
@@ -116,7 +123,7 @@ struct FindFeaturesBody : ParallelLoopBody
                      std::vector<ImageFeatures> &features, const std::vector<std::vector<cv::Rect> > *rois)
             : finder_(finder), images_(images), features_(features), rois_(rois) {}
 
-    void operator ()(const Range &r) const
+    void operator ()(const Range &r) const CV_OVERRIDE
     {
         for (int i = r.start; i < r.end; ++i)
         {
@@ -146,18 +153,18 @@ typedef std::set<std::pair<int,int> > MatchesSet;
 // These two classes are aimed to find features matches only, not to
 // estimate homography
 
-class CpuMatcher : public FeaturesMatcher
+class CpuMatcher CV_FINAL : public FeaturesMatcher
 {
 public:
     CpuMatcher(float match_conf) : FeaturesMatcher(true), match_conf_(match_conf) {}
-    void match(const ImageFeatures &features1, const ImageFeatures &features2, MatchesInfo& matches_info);
+    void match(const ImageFeatures &features1, const ImageFeatures &features2, MatchesInfo& matches_info) CV_OVERRIDE;
 
 private:
     float match_conf_;
 };
 
 #ifdef HAVE_OPENCV_CUDAFEATURES2D
-class GpuMatcher : public FeaturesMatcher
+class GpuMatcher CV_FINAL : public FeaturesMatcher
 {
 public:
     GpuMatcher(float match_conf) : match_conf_(match_conf) {}
@@ -181,16 +188,11 @@ void CpuMatcher::match(const ImageFeatures &features1, const ImageFeatures &feat
     CV_Assert(features1.descriptors.type() == features2.descriptors.type());
     CV_Assert(features2.descriptors.depth() == CV_8U || features2.descriptors.depth() == CV_32F);
 
-#ifdef HAVE_TEGRA_OPTIMIZATION
-    if (tegra::useTegra() && tegra::match2nearest(features1, features2, matches_info, match_conf_))
-        return;
-#endif
-
     matches_info.matches.clear();
 
     Ptr<cv::DescriptorMatcher> matcher;
 #if 0 // TODO check this
-    if (ocl::useOpenCL())
+    if (ocl::isOpenCLActivated())
     {
         matcher = makePtr<BFMatcher>((int)NORM_L2);
     }
@@ -386,10 +388,12 @@ void FeaturesFinder::operator ()(InputArrayOfArrays images, std::vector<ImageFea
 
 bool FeaturesFinder::isThreadSafe() const
 {
-    if (ocl::useOpenCL())
+#ifdef HAVE_OPENCL
+    if (ocl::isOpenCLActivated())
     {
         return false;
     }
+#endif
     if (dynamic_cast<const SurfFeaturesFinder*>(this))
     {
         return true;
@@ -470,6 +474,35 @@ void SurfFeaturesFinder::find(InputArray image, ImageFeatures &features)
         surf->detectAndCompute(gray_image, Mat(), features.keypoints, descriptors);
         features.descriptors = descriptors.reshape(1, (int)features.keypoints.size());
     }
+}
+
+SiftFeaturesFinder::SiftFeaturesFinder()
+{
+#ifdef HAVE_OPENCV_XFEATURES2D
+    Ptr<SIFT> sift_ = SIFT::create();
+    if( !sift_ )
+        CV_Error( Error::StsNotImplemented, "OpenCV was built without SIFT support" );
+    sift = sift_;
+#else
+    CV_Error( Error::StsNotImplemented, "OpenCV was built without SIFT support" );
+#endif
+}
+
+void SiftFeaturesFinder::find(InputArray image, ImageFeatures &features)
+{
+    UMat gray_image;
+    CV_Assert((image.type() == CV_8UC3) || (image.type() == CV_8UC1));
+    if(image.type() == CV_8UC3)
+    {
+        cvtColor(image, gray_image, COLOR_BGR2GRAY);
+    }
+    else
+    {
+        gray_image = image.getUMat();
+    }
+    UMat descriptors;
+    sift->detectAndCompute(gray_image, Mat(), features.keypoints, descriptors);
+    features.descriptors = descriptors.reshape(1, (int)features.keypoints.size());
 }
 
 OrbFeaturesFinder::OrbFeaturesFinder(Size _grid_size, int n_features, float scaleFactor, int nlevels)
@@ -558,10 +591,7 @@ AKAZEFeaturesFinder::AKAZEFeaturesFinder(int descriptor_type,
 void AKAZEFeaturesFinder::find(InputArray image, detail::ImageFeatures &features)
 {
     CV_Assert((image.type() == CV_8UC3) || (image.type() == CV_8UC1));
-    Mat descriptors;
-    UMat uimage = image.getUMat();
-    akaze->detectAndCompute(uimage, UMat(), features.keypoints, descriptors);
-    features.descriptors = descriptors.getUMat(ACCESS_READ);
+    akaze->detectAndCompute(image, noArray(), features.keypoints, features.descriptors);
 }
 
 #ifdef HAVE_OPENCV_XFEATURES2D
@@ -586,7 +616,12 @@ void SurfFeaturesFinderGpu::find(InputArray image, ImageFeatures &features)
     image_.upload(image);
 
     ensureSizeIsEnough(image.size(), CV_8UC1, gray_image_);
+
+#ifdef HAVE_OPENCV_CUDAIMGPROC
+    cv::cuda::cvtColor(image_, gray_image_, COLOR_BGR2GRAY);
+#else
     cvtColor(image_, gray_image_, COLOR_BGR2GRAY);
+#endif
 
     surf_.nOctaves = num_octaves_;
     surf_.nOctaveLayers = num_layers_;
@@ -619,7 +654,7 @@ MatchesInfo::MatchesInfo() : src_img_idx(-1), dst_img_idx(-1), num_inliers(0), c
 
 MatchesInfo::MatchesInfo(const MatchesInfo &other) { *this = other; }
 
-const MatchesInfo& MatchesInfo::operator =(const MatchesInfo &other)
+MatchesInfo& MatchesInfo::operator =(const MatchesInfo &other)
 {
     src_img_idx = other.src_img_idx;
     dst_img_idx = other.dst_img_idx;
@@ -849,7 +884,7 @@ void AffineBestOf2NearestMatcher::match(const ImageFeatures &features1, const Im
     /* should we remove matches between too close images? */
     // matches_info.confidence = matches_info.confidence > 3. ? 0. : matches_info.confidence;
 
-    // extend H to represent linear tranformation in homogeneous coordinates
+    // extend H to represent linear transformation in homogeneous coordinates
     matches_info.H.push_back(Mat::zeros(1, 3, CV_64F));
     matches_info.H.at<double>(2, 2) = 1;
 }

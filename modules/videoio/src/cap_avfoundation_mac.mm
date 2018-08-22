@@ -305,7 +305,8 @@ int CvCaptureCAM::startCaptureDevice(int cameraNum) {
     NSAutoreleasePool *localpool = [[NSAutoreleasePool alloc] init];
 
     // get capture device
-    NSArray *devices = [AVCaptureDevice devicesWithMediaType: AVMediaTypeVideo];
+    NSArray *devices = [[AVCaptureDevice devicesWithMediaType: AVMediaTypeVideo]
+            arrayByAddingObjectsFromArray:[AVCaptureDevice devicesWithMediaType:AVMediaTypeMuxed]];
 
     if ( devices.count == 0 ) {
         fprintf(stderr, "OpenCV: AVFoundation didn't find any attached Video Input Devices!\n");
@@ -693,7 +694,15 @@ CvCaptureFile::CvCaptureFile(const char* filename) {
         return;
     }
 
-    mAssetTrack = [[mAsset tracksWithMediaType: AVMediaTypeVideo][0] retain];
+    NSArray *tracks = [mAsset tracksWithMediaType:AVMediaTypeVideo];
+    if ([tracks count] == 0) {
+        fprintf(stderr, "OpenCV: Couldn't read video stream from file \"%s\"\n", filename);
+        [localpool drain];
+        started = 0;
+        return;
+    }
+
+    mAssetTrack = [tracks[0] retain];
 
     if ( ! setupReadingAt(kCMTimeZero) ) {
         fprintf(stderr, "OpenCV: Couldn't read movie file \"%s\"\n", filename);
@@ -844,7 +853,7 @@ IplImage* CvCaptureFile::retrieveFramePixelBuffer() {
         return 0;
     }
 
-     // Output image paramaters.
+     // Output image parameters.
      int outChannels;
      if (mMode == CV_CAP_MODE_BGR || mMode == CV_CAP_MODE_RGB) {
          outChannels = 3;
@@ -878,7 +887,7 @@ IplImage* CvCaptureFile::retrieveFramePixelBuffer() {
     mOutImage->imageData = reinterpret_cast<char *>(mOutImagedata);
     mOutImage->imageSize = int(currSize);
 
-    // Device image paramaters and conversion code.
+    // Device image parameters and conversion code.
     // (Not all of these conversions are used in production, but they were all tested to find the fastest options.)
     int deviceChannels;
     int cvtCode;

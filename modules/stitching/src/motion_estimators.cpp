@@ -89,7 +89,7 @@ struct CalcRotation
 
 
 /**
- * @brief Functor calculating final tranformation by chaining linear transformations
+ * @brief Functor calculating final transformation by chaining linear transformations
  */
 struct CalcAffineTransform
 {
@@ -199,7 +199,7 @@ bool AffineBasedEstimator::estimate(const std::vector<ImageFeatures> &features,
                                     const std::vector<MatchesInfo> &pairwise_matches,
                                     std::vector<CameraParams> &cameras)
 {
-    cameras.resize(features.size());
+    cameras.assign(features.size(), CameraParams());
     const int num_images = static_cast<int>(features.size());
 
     // find maximum spaning tree on pairwise matches

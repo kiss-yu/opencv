@@ -56,20 +56,18 @@ void cv::seamlessClone(InputArray _src, InputArray _dst, InputArray _mask, Point
     const Mat mask = _mask.getMat();
     _blend.create(dest.size(), CV_8UC3);
     Mat blend = _blend.getMat();
+    dest.copyTo(blend);
 
     int minx = INT_MAX, miny = INT_MAX, maxx = INT_MIN, maxy = INT_MIN;
     int h = mask.size().height;
     int w = mask.size().width;
 
-    Mat gray = Mat(mask.size(),CV_8UC1);
-    Mat dst_mask = Mat::zeros(dest.size(),CV_8UC1);
-    Mat cs_mask = Mat::zeros(src.size(),CV_8UC3);
-    Mat cd_mask = Mat::zeros(dest.size(),CV_8UC3);
+    Mat gray;
 
     if(mask.channels() == 3)
         cvtColor(mask, gray, COLOR_BGR2GRAY );
     else
-        gray = mask;
+        mask.copyTo(gray);
 
     for(int i=0;i<h;i++)
     {
@@ -77,46 +75,37 @@ void cv::seamlessClone(InputArray _src, InputArray _dst, InputArray _mask, Point
         {
             if(gray.at<uchar>(i,j) == 255)
             {
-                minx = std::min(minx,i);
-                maxx = std::max(maxx,i);
-                miny = std::min(miny,j);
-                maxy = std::max(maxy,j);
+                miny = std::min(miny,i);
+                maxy = std::max(maxy,i);
+                minx = std::min(minx,j);
+                maxx = std::max(maxx,j);
             }
         }
     }
 
-    int lenx = maxx - minx;
-    int leny = maxy - miny;
+    int lenx = maxx - minx + 1;
+    int leny = maxy - miny + 1;
 
-    Mat patch = Mat::zeros(Size(leny, lenx), CV_8UC3);
+    int minxd = p.x - lenx/2;
+    int minyd = p.y - leny/2;
 
-    int minxd = p.y - lenx/2;
-    int maxxd = p.y + lenx/2;
-    int minyd = p.x - leny/2;
-    int maxyd = p.x + leny/2;
+    Rect roi_d(minxd,minyd,lenx,leny);
+    Rect roi_s(minx,miny,lenx,leny);
 
-    CV_Assert(minxd >= 0 && minyd >= 0 && maxxd <= dest.rows && maxyd <= dest.cols);
+    Mat destinationROI = dest(roi_d).clone();
 
-    Rect roi_d(minyd,minxd,leny,lenx);
-    Rect roi_s(miny,minx,leny,lenx);
-
-    Mat destinationROI = dst_mask(roi_d);
-    Mat sourceROI = cs_mask(roi_s);
-
-    gray(roi_s).copyTo(destinationROI);
+    Mat sourceROI = Mat::zeros(leny, lenx, src.type());
     src(roi_s).copyTo(sourceROI,gray(roi_s));
-    src(roi_s).copyTo(patch, gray(roi_s));
 
-    destinationROI = cd_mask(roi_d);
-    cs_mask(roi_s).copyTo(destinationROI);
-
+    Mat maskROI = gray(roi_s);
+    Mat recoveredROI = blend(roi_d);
 
     Cloning obj;
-    obj.normalClone(dest,cd_mask,dst_mask,blend,flags);
+    obj.normalClone(destinationROI,sourceROI,maskROI,recoveredROI,flags);
 
 }
 
-void cv::colorChange(InputArray _src, InputArray _mask, OutputArray _dst, float r, float g, float b)
+void cv::colorChange(InputArray _src, InputArray _mask, OutputArray _dst, float red, float green, float blue)
 {
     CV_INSTRUMENT_REGION()
 
@@ -125,18 +114,12 @@ void cv::colorChange(InputArray _src, InputArray _mask, OutputArray _dst, float 
     _dst.create(src.size(), src.type());
     Mat blend = _dst.getMat();
 
-    float red = r;
-    float green = g;
-    float blue = b;
-
-    Mat gray = Mat::zeros(mask.size(),CV_8UC1);
+    Mat gray, cs_mask;
 
     if(mask.channels() == 3)
         cvtColor(mask, gray, COLOR_BGR2GRAY );
     else
-        gray = mask;
-
-    Mat cs_mask = Mat::zeros(src.size(),CV_8UC3);
+        mask.copyTo(gray);
 
     src.copyTo(cs_mask,gray);
 
@@ -144,26 +127,21 @@ void cv::colorChange(InputArray _src, InputArray _mask, OutputArray _dst, float 
     obj.localColorChange(src,cs_mask,gray,blend,red,green,blue);
 }
 
-void cv::illuminationChange(InputArray _src, InputArray _mask, OutputArray _dst, float a, float b)
+void cv::illuminationChange(InputArray _src, InputArray _mask, OutputArray _dst, float alpha, float beta)
 {
     CV_INSTRUMENT_REGION()
-
 
     Mat src  = _src.getMat();
     Mat mask  = _mask.getMat();
     _dst.create(src.size(), src.type());
     Mat blend = _dst.getMat();
-    float alpha = a;
-    float beta = b;
 
-    Mat gray = Mat::zeros(mask.size(),CV_8UC1);
+    Mat gray, cs_mask;
 
     if(mask.channels() == 3)
         cvtColor(mask, gray, COLOR_BGR2GRAY );
     else
-        gray = mask;
-
-    Mat cs_mask = Mat::zeros(src.size(),CV_8UC3);
+        mask.copyTo(gray);
 
     src.copyTo(cs_mask,gray);
 
@@ -177,20 +155,16 @@ void cv::textureFlattening(InputArray _src, InputArray _mask, OutputArray _dst,
 {
     CV_INSTRUMENT_REGION()
 
-
     Mat src  = _src.getMat();
     Mat mask  = _mask.getMat();
     _dst.create(src.size(), src.type());
     Mat blend = _dst.getMat();
-
-    Mat gray = Mat::zeros(mask.size(),CV_8UC1);
+    Mat gray, cs_mask;
 
     if(mask.channels() == 3)
         cvtColor(mask, gray, COLOR_BGR2GRAY );
     else
-        gray = mask;
-
-    Mat cs_mask = Mat::zeros(src.size(),CV_8UC3);
+        mask.copyTo(gray);
 
     src.copyTo(cs_mask,gray);
 

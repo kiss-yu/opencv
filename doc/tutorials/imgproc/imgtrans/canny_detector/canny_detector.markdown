@@ -1,6 +1,9 @@
 Canny Edge Detector {#tutorial_canny_detector}
 ===================
 
+@prev_tutorial{tutorial_laplace_operator}
+@next_tutorial{tutorial_hough_lines}
+
 Goal
 ----
 
@@ -11,7 +14,7 @@ In this tutorial you will learn how to:
 Theory
 ------
 
-The *Canny Edge detector* was developed by John F. Canny in 1986. Also known to many as the
+The *Canny Edge detector* @cite Canny86 was developed by John F. Canny in 1986. Also known to many as the
 *optimal detector*, the Canny algorithm aims to satisfy three main criteria:
 -   **Low error rate:** Meaning a good detection of only existent edges.
 -   **Good localization:** The distance between edge pixels detected and real edge pixels have
@@ -66,38 +69,52 @@ The *Canny Edge detector* was developed by John F. Canny in 1986. Also known to 
 Code
 ----
 
--#  **What does this program do?**
+@add_toggle_cpp
+-   The tutorial code's is shown lines below. You can also download it from
+    [here](https://github.com/opencv/opencv/tree/master/samples/cpp/tutorial_code/ImgTrans/CannyDetector_Demo.cpp)
+    @include samples/cpp/tutorial_code/ImgTrans/CannyDetector_Demo.cpp
+@end_toggle
+
+@add_toggle_java
+-   The tutorial code's is shown lines below. You can also download it from
+    [here](https://github.com/opencv/opencv/tree/master/samples/java/tutorial_code/ImgTrans/canny_detector/CannyDetectorDemo.java)
+    @include samples/java/tutorial_code/ImgTrans/canny_detector/CannyDetectorDemo.java
+@end_toggle
+
+@add_toggle_python
+-   The tutorial code's is shown lines below. You can also download it from
+    [here](https://github.com/opencv/opencv/tree/master/samples/python/tutorial_code/ImgTrans/canny_detector/CannyDetector_Demo.py)
+    @include samples/python/tutorial_code/ImgTrans/canny_detector/CannyDetector_Demo.py
+@end_toggle
+
+-   **What does this program do?**
     -   Asks the user to enter a numerical value to set the lower threshold for our *Canny Edge
-        Detector* (by means of a Trackbar)
+        Detector* (by means of a Trackbar).
     -   Applies the *Canny Detector* and generates a **mask** (bright lines representing the edges
         on a black background).
     -   Applies the mask obtained on the original image and display it in a window.
 
--#  The tutorial code's is shown lines below. You can also download it from
-    [here](https://github.com/opencv/opencv/tree/master/samples/cpp/tutorial_code/ImgTrans/CannyDetector_Demo.cpp)
-    @include samples/cpp/tutorial_code/ImgTrans/CannyDetector_Demo.cpp
-
-Explanation
------------
+Explanation (C++ code)
+----------------------
 
 -#  Create some needed variables:
     @snippet cpp/tutorial_code/ImgTrans/CannyDetector_Demo.cpp variables
 
     Note the following:
 
-    -#  We establish a ratio of lower:upper threshold of 3:1 (with the variable *ratio*)
+    -#  We establish a ratio of lower:upper threshold of 3:1 (with the variable *ratio*).
     -#  We set the kernel size of \f$3\f$ (for the Sobel operations to be performed internally by the
-        Canny function)
+        Canny function).
     -#  We set a maximum value for the lower Threshold of \f$100\f$.
 
 -#  Loads the source image:
     @snippet cpp/tutorial_code/ImgTrans/CannyDetector_Demo.cpp load
 
--#  Create a matrix of the same type and size of *src* (to be *dst*)
+-#  Create a matrix of the same type and size of *src* (to be *dst*):
     @snippet cpp/tutorial_code/ImgTrans/CannyDetector_Demo.cpp create_mat
--#  Convert the image to grayscale (using the function @ref cv::cvtColor :
+-#  Convert the image to grayscale (using the function @ref cv::cvtColor ):
     @snippet cpp/tutorial_code/ImgTrans/CannyDetector_Demo.cpp convert_to_gray
--#  Create a window to display the results
+-#  Create a window to display the results:
     @snippet cpp/tutorial_code/ImgTrans/CannyDetector_Demo.cpp create_window
 -#  Create a Trackbar for the user to enter the lower threshold for our Canny detector:
     @snippet cpp/tutorial_code/ImgTrans/CannyDetector_Demo.cpp create_trackbar

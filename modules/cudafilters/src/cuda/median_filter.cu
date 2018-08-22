@@ -42,11 +42,6 @@
 
 #if !defined CUDA_DISABLER
 
-#include "precomp.hpp"
-
-using namespace cv;
-using namespace cv::cuda;
-
 #include "opencv2/core/cuda/common.hpp"
 #include "opencv2/core/cuda/vec_traits.hpp"
 #include "opencv2/core/cuda/vec_math.hpp"
@@ -251,7 +246,7 @@ namespace cv { namespace cuda { namespace device
         }
         __syncthreads();
 
-        // Fot all remaining rows in the median filter, add the values to the the histogram
+        // For all remaining rows in the median filter, add the values to the the histogram
         for (int j=threadIdx.x; j<cols; j+=blockDim.x){
             for(int i=initStartRow; i<initStopRow; i++){
                     int pos=::min(i,rows-1);

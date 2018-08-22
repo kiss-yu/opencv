@@ -97,7 +97,7 @@ Tested with 2.6.12 with libdc1394-1.0.0, libraw1394-0.10.1 using a Point Grey Fl
 
 #include "precomp.hpp"
 
-#if !defined WIN32 && defined HAVE_DC1394
+#if !defined _WIN32 && defined HAVE_DC1394
 
 #include <unistd.h>
 #include <stdint.h>
@@ -1049,11 +1049,11 @@ public:
     virtual bool open( int index );
     virtual void close();
 
-    virtual double getProperty(int) const;
-    virtual bool setProperty(int, double);
-    virtual bool grabFrame();
-    virtual IplImage* retrieveFrame(int);
-    virtual int getCaptureDomain() { return CV_CAP_DC1394; } // Return the type of the capture object: CV_CAP_VFW, etc...
+    virtual double getProperty(int) const CV_OVERRIDE;
+    virtual bool setProperty(int, double) CV_OVERRIDE;
+    virtual bool grabFrame() CV_OVERRIDE;
+    virtual IplImage* retrieveFrame(int) CV_OVERRIDE;
+    virtual int getCaptureDomain() CV_OVERRIDE { return CV_CAP_DC1394; } // Return the type of the capture object: CV_CAP_VFW, etc...
 protected:
 
     CvCaptureCAM_DC1394* captureDC1394;

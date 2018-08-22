@@ -325,6 +325,16 @@ double cv::findTransformECC(InputArray templateImage,
     CV_Assert(!src.empty());
     CV_Assert(!dst.empty());
 
+    // If the user passed an un-initialized warpMatrix, initialize to identity
+    if(map.empty()) {
+        int rowCount = 2;
+        if(motionType == MOTION_HOMOGRAPHY)
+            rowCount = 3;
+
+        warpMatrix.create(rowCount, 3, CV_32FC1);
+        map = warpMatrix.getMat();
+        map = Mat::eye(rowCount, 3, CV_32F);
+    }
 
     if( ! (src.type()==dst.type()))
         CV_Error( Error::StsUnmatchedFormats, "Both input images must have the same data type" );
@@ -394,7 +404,7 @@ double cv::findTransformECC(InputArray templateImage,
     Mat templateFloat = Mat(hs, ws, CV_32F);// to store the (smoothed) template
     Mat imageFloat    = Mat(hd, wd, CV_32F);// to store the (smoothed) input image
     Mat imageWarped   = Mat(hs, ws, CV_32F);// to store the warped zero-mean input image
-    Mat imageMask		= Mat(hs, ws, CV_8U); //to store the final mask
+    Mat imageMask     = Mat(hs, ws, CV_8U); // to store the final mask
 
     Mat inputMaskMat = inputMask.getMat();
     //to use it for mask warping

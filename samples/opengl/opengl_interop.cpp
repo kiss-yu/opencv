@@ -5,7 +5,7 @@
 // and call cv::Blur function. The result is mapped back to OpenGL texture
 // and rendered through OpenGL API.
 */
-#if defined(WIN32) || defined(_WIN32)
+#if defined(_WIN32)
 # define WIN32_LEAN_AND_MEAN
 # include <windows.h>
 #elif defined(__linux__)
@@ -27,10 +27,12 @@
 
 #include "winapp.hpp"
 
-#if defined(WIN32) || defined(_WIN32)
+#if defined(_WIN32)
 # pragma comment(lib, "opengl32.lib")
 # pragma comment(lib, "glu32.lib")
 #endif
+
+using namespace cv;
 
 /*
 // Press key   to
@@ -64,7 +66,7 @@ public:
 
     ~GLWinApp() {}
 
-    virtual void cleanup()
+    virtual void cleanup() CV_OVERRIDE
     {
         m_shutdown = true;
 #if defined(__linux__)
@@ -74,8 +76,8 @@ public:
         WinApp::cleanup();
     }
 
-#if defined(WIN32) || defined(_WIN32)
-    virtual LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+#if defined(_WIN32)
+    virtual LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) CV_OVERRIDE
     {
         switch (message)
         {
@@ -121,7 +123,7 @@ public:
 #endif
 
 #if defined(__linux__)
-    int handle_event(XEvent& e)
+    int handle_event(XEvent& e) CV_OVERRIDE
     {
         switch(e.type)
         {
@@ -167,9 +169,9 @@ public:
     }
 #endif
 
-    int init()
+    int init() CV_OVERRIDE
     {
-#if defined(WIN32) || defined(_WIN32)
+#if defined(_WIN32)
         m_hDC = GetDC(m_hWnd);
 
         if (setup_pixel_format() != 0)
@@ -207,7 +209,7 @@ public:
         if (!m_cap.read(m_frame_bgr))
             return -1;
 
-        cv::cvtColor(m_frame_bgr, m_frame_rgba, CV_RGB2RGBA);
+        cv::cvtColor(m_frame_bgr, m_frame_rgba, COLOR_RGB2RGBA);
 
         if (do_buffer)
             buffer.copyFrom(m_frame_rgba, cv::ogl::Buffer::PIXEL_UNPACK_BUFFER, true);
@@ -219,7 +221,7 @@ public:
 
     void print_info(MODE mode, float time, cv::String& oclDevName)
     {
-#if defined(WIN32) || defined(_WIN32)
+#if defined(_WIN32)
         HDC hDC = m_hDC;
 
         HFONT hFont = (HFONT)::GetStockObject(SYSTEM_FONT);
@@ -258,12 +260,12 @@ public:
 #endif
     }
 
-    void idle()
+    void idle() CV_OVERRIDE
     {
         render();
     }
 
-    int render()
+    int render() CV_OVERRIDE
     {
         try
         {
@@ -323,7 +325,7 @@ public:
             glTexCoord2f(1.0f, 0.0f); glVertex3f(1.0f, 1.0f, 0.1f);
             glEnd();
 
-#if defined(WIN32) || defined(_WIN32)
+#if defined(_WIN32)
             SwapBuffers(m_hDC);
 #elif defined(__linux__)
             glXSwapBuffers(m_display, m_window);
@@ -394,7 +396,7 @@ protected:
         m_timer.stop();
     }
 
-#if defined(WIN32) || defined(_WIN32)
+#if defined(_WIN32)
     int setup_pixel_format()
     {
         PIXELFORMATDESCRIPTOR  pfd;
@@ -459,7 +461,7 @@ private:
     bool               m_demo_processing;
     MODE               m_mode;
     cv::String         m_modeStr[2];
-#if defined(WIN32) || defined(_WIN32)
+#if defined(_WIN32)
     HDC                m_hDC;
     HGLRC              m_hRC;
 #elif defined(__linux__)
@@ -524,7 +526,7 @@ int main(int argc, char** argv)
     int width  = (int)cap.get(CAP_PROP_FRAME_WIDTH);
     int height = (int)cap.get(CAP_PROP_FRAME_HEIGHT);
 
-#if defined(WIN32) || defined(_WIN32)
+#if defined(_WIN32)
     string wndname = "WGL Window";
 #elif defined(__linux__)
     string wndname = "GLX Window";
